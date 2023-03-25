@@ -26,6 +26,11 @@ local dst = {
 }
 
 local function print_table(node)
+    if type(node) ~= "table" then
+        print(tostring(node))
+        return
+    end
+
     local cache, stack, output = {}, {}, {}
     local depth = 1
     local output_str = "{\n"

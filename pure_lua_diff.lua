@@ -1,4 +1,8 @@
 function _G.lua_diff(A, B)
+    if type(A) ~= "table" or type(B) ~= "table" then
+        return B
+    end
+
     local diff = { __diff_lua_del = {} }
 
     for k, v in pairs(A) do
@@ -33,6 +37,10 @@ function _G.lua_diff(A, B)
 end
 
 function _G.lua_patch(A, diff)
+    if type(A) ~= "table" or type(diff) ~= "table" then
+        return diff
+    end
+
     if diff.__diff_lua_del ~= nil then
         for k, _ in pairs(diff.__diff_lua_del) do
             A[k] = nil
