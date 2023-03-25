@@ -15,7 +15,7 @@ function _G.lua_diff(A, B)
                 diff[k] = nil
             end
         elseif B[k] == nil then
-            diff.__diff_lua_del[k] = 0
+            diff.__diff_lua_del[#diff.__diff_lua_del + 1] = k
         elseif B[k] ~= v then
             diff[k] = B[k]
         end
@@ -42,7 +42,7 @@ function _G.lua_patch(A, diff)
     end
 
     if diff.__diff_lua_del ~= nil then
-        for k, _ in pairs(diff.__diff_lua_del) do
+        for _, k in pairs(diff.__diff_lua_del) do
             A[k] = nil
         end
     end
