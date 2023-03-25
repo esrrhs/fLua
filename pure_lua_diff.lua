@@ -6,7 +6,7 @@ function _G.lua_diff(A, B)
     local diff = { __diff_lua_del = {} }
 
     for k, v in pairs(A) do
-        if type(A[k]) == "function" or type(A[k]) == "userdata" then
+        if type(A[k]) == "function" or type(A[k]) == "userdata" or type(A[k]) == "thread" then
             error("table_diff only supports diffs of tables!")
         elseif B[k] ~= nil and type(A[k]) == "table" and type(B[k]) == "table" then
             diff[k] = lua_diff(A[k], B[k])
@@ -22,7 +22,7 @@ function _G.lua_diff(A, B)
     end
 
     for k, v in pairs(B) do
-        if type(B[k]) == "function" or type(B[k]) == "userdata" then
+        if type(B[k]) == "function" or type(B[k]) == "userdata" or type(B[k]) == "thread" then
             error("table_diff only supports diffs of tables!")
         elseif not A[k] then
             diff[k] = v
