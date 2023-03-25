@@ -11,3 +11,4 @@ IF (WIN32)
 ELSE ()
     target_link_libraries(difflua lua dl)
 ENDIF ()
+
