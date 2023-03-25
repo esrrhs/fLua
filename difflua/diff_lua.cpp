@@ -62,7 +62,7 @@ extern "C" void reset_env(DiffEnv *env, DiffLoggerInterface *log) {
     LOG_DEBUG("start reset_env");
 
     auto cur = env->GetCur();
-    LOG_DEBUG("cur is %s", cur->Dump());
+    LOG_DEBUG("cur is %s", cur->Dump().c_str());
 
     env->SetCur(std::make_shared<DiffVar>());
 }
