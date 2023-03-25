@@ -16,9 +16,9 @@ int main(int argc, char *argv[]) {
     auto env = new_diff_env();
     MyLogger logger;
 
-    DiffVarInterface *input = 0;
-    DiffVarInterface *diff = 0;
-    if (calc_env_diff(env, &logger, input, diff) != 0) {
+    auto input = std::make_shared<DiffVar>();
+    auto diff = calc_env_diff(env, &logger, input);
+    if (!diff) {
         printf("calc_env_diff failed\n");
         return -1;
     }

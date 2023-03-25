@@ -24,53 +24,25 @@
     } \
 } while(0)
 
-class DiffVar : public DiffVarInterface {
-public:
-    DiffVar() {
-    }
-
-    virtual ~DiffVar() {
-    }
-
-    virtual DiffType Type() {
-        return m_type;
-    }
-
-    virtual const char *Dump() {
-        // TODO
-        return "TODO";
-    }
-
-    virtual int CloneFrom(DiffVarInterface *other) {
-        // TODO
-        m_type = other->Type();
-        return 0;
-    }
-
-private:
-    DiffType m_type = DT_NIL;
-};
-
 class DiffEnv {
 public:
     DiffEnv() {
-        m_cur = new DiffVar();
+        m_cur = std::make_shared<DiffVar>();
     }
 
     virtual ~DiffEnv() {
-        delete m_cur;
     }
 
-    DiffVar *GetCur() {
+    DiffVarInterfacePtr GetCur() {
         return m_cur;
     }
 
-    void SetCur(DiffVar *pVar) {
+    void SetCur(DiffVarInterfacePtr pVar) {
         m_cur = pVar;
     }
 
 private:
-    DiffVar *m_cur = 0;
+    DiffVarInterfacePtr m_cur;
 };
 
 extern "C" DiffEnv *new_diff_env() {
@@ -92,22 +64,66 @@ extern "C" void reset_env(DiffEnv *env, DiffLoggerInterface *log) {
     auto cur = env->GetCur();
     LOG_DEBUG("cur is %s", cur->Dump());
 
-    delete cur;
-    env->SetCur(new DiffVar());
+    env->SetCur(std::make_shared<DiffVar>());
 }
 
-extern "C" int calc_env_diff(DiffEnv *env, DiffLoggerInterface *log, DiffVarInterface *input, DiffVarInterface *&diff) {
-    diff = 0;
+static DiffVarInterfacePtr table_diff(DiffVarInterfacePtr src, DiffVarInterfacePtr dst) {
+    auto ret = dst->NewTable();
 
+    auto del = dst->NewTable();
+
+    auto it = src->GetTableIterator();
+    while (it->Next()) {
+        auto k = it->Key();
+        auto v = it->Value();
+
+        auto dst_v = dst->GetTableValue(k);
+        if (!dst_v) {
+            del->SetTableKeyValue(k, dst->NewInteger(0));
+        } else {
+            auto v_is_table = v->Type() == DT_TABLE;
+            auto dst_v_is_table = dst_v->Type() == DT_TABLE;
+            if (v_is_table && dst_v_is_table) {
+                auto sub_diff = table_diff(v, dst_v);
+                if (sub_diff->GetTableSize() > 0) {
+                    ret->SetTableKeyValue(k, sub_diff);
+                }
+            } else {
+                if (!v->Equal(dst_v)) {
+                    ret->SetTableKeyValue(k, dst_v);
+                }
+            }
+        }
+    }
+
+    it = dst->GetTableIterator();
+    while (it->Next()) {
+        auto k = it->Key();
+        auto v = it->Value();
+
+        auto src_v = src->GetTableValue(k);
+        if (!src_v) {
+            ret->SetTableKeyValue(k, v);
+        }
+    }
+
+    if (del->GetTableSize() > 0) {
+        ret->SetTableKeyValue(dst->NewString("__diff_lua_del", strlen("__diff_lua_del")), del);
+    }
+
+    return ret;
+}
+
+extern "C" DiffVarInterfacePtr calc_env_diff(DiffEnv *env, DiffLoggerInterface *log, DiffVarInterfacePtr input) {
     if (!env || !input) {
         LOG_ERROR("invalid param");
-        return -1;
+        return 0;
     }
 
     LOG_DEBUG("start calc_env_diff");
 
     auto cur = env->GetCur();
-    LOG_DEBUG("cur is %s", cur->Dump());
+    LOG_DEBUG("cur is %s", cur->Dump().c_str());
 
     auto cur_type = cur->Type();
     auto input_type = input->Type();
@@ -116,19 +132,15 @@ extern "C" int calc_env_diff(DiffEnv *env, DiffLoggerInterface *log, DiffVarInte
 
     if (cur_is_table && input_is_table) {
         LOG_DEBUG("cur and input are both table, need diff");
-
-        // TODO
+        return table_diff(cur, input);
     } else {
-        LOG_DEBUG("just simple clone input: %s to cur: %s", input->Dump(), cur->Dump());
+        LOG_DEBUG("just simple clone input: %s to cur: %s", input->Dump().c_str(), cur->Dump().c_str());
         auto ret = cur->CloneFrom(input);
         if (ret != 0) {
-            LOG_ERROR("clone from input failed %s", input->Dump());
-            return -1;
+            LOG_ERROR("clone from input failed %s", input->Dump().c_str());
+            return 0;
         }
-        LOG_DEBUG("cur is now %s", cur->Dump());
-        diff = input;
-        LOG_DEBUG("diff is %s", diff->Dump());
+        LOG_DEBUG("cur and diff is now %s", cur->Dump().c_str());
+        return input;
     }
-
-    return 0;
 }
