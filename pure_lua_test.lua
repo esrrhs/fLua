@@ -11,7 +11,13 @@ local src = {
         c = 33.3,
         d = true,
     },
-    array = { 1, 2, 3, 4 }
+    array = { 1, 2, 3, 4 },
+    obj_array = {
+        { id = 1, a = 1, b = 2 },
+        { id = 2, a = 3, b = 4 },
+        { id = 3, a = 5, b = 6 },
+        { id = 4, a = 7, b = 8 },
+    }
 }
 
 local dst = {
@@ -22,7 +28,12 @@ local dst = {
         a = 12,
         b = "11",
     },
-    array = { 2, 3 }
+    array = { 2, 3 },
+    obj_array = {
+        { id = 2, a = 3, b = 4 },
+        { id = 3, a = 5, b = 6 },
+        { id = 4, a = 70, b = 80 },
+    }
 }
 
 local function print_table(node)
@@ -109,8 +120,12 @@ local function print_table(node)
     print(output_str)
 end
 
-local diff = lua_diff(src, dst)
+local get_id = function(v)
+    return v.id
+end
+
+local diff = lua_diff(src, dst, get_id)
 print_table(diff)
 
-local new_dst = lua_patch(src, diff)
+local new_dst = lua_patch(src, diff, get_id)
 print_table(new_dst)
