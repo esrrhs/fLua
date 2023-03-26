@@ -99,7 +99,7 @@ end
 ```lua
 local new_dst = lua_patch(src, diff, get_id)
 ```
-最终新的table与dst是相等的：
+最终新的table与dst是相等的，注意这里obj_array里的元素顺序不一定是完全一致的
 ```lua
 {
 	['b'] = '2',
