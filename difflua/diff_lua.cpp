@@ -1,29 +1,28 @@
 #include <vector>
 #include "diff_lua.h"
 
-#define LOG_ERROR(fmt, ...) do { \
-    if(log && log->Level() <= DiffLoggerInterface::ERROR) { \
-        char buf[1024] = {0}; \
-        snprintf(buf,1024,fmt,##__VA_ARGS__); \
-        log->Log(DiffLoggerInterface::ERROR,__FILE__,__LINE__,__FUNCTION__,buf); \
-    } \
-} while(0)
+#define USE_DIFF_LOG
 
-#define LOG_INFO(fmt, ...) do { \
-    if(log && log->Level() <= DiffLoggerInterface::INFO) { \
+#ifdef USE_DIFF_LOG
+#define LOG_ERROR(fmt, ...) do { \
+    { \
         char buf[1024] = {0}; \
         snprintf(buf,1024,fmt,##__VA_ARGS__); \
-        log->Log(DiffLoggerInterface::INFO,__FILE__,__LINE__,__FUNCTION__,buf); \
+        printf("[%s] %s:%d %s %s","ERROR",__FILE__,__LINE__,__FUNCTION__,buf); \
     } \
 } while(0)
 
 #define LOG_DEBUG(fmt, ...) do { \
-    if(log && log->Level() <= DiffLoggerInterface::DEBUG) { \
+    { \
         char buf[1024] = {0}; \
         snprintf(buf,1024,fmt,##__VA_ARGS__); \
-        log->Log(DiffLoggerInterface::DEBUG,__FILE__,__LINE__,__FUNCTION__,buf); \
+        printf("[%s] %s:%d %s %s","DEBUG",__FILE__,__LINE__,__FUNCTION__,buf); \
     } \
 } while(0)
+#else
+#define LOG_ERROR(fmt, ...)
+#define LOG_DEBUG(fmt, ...)
+#endif
 
 DiffVar::DiffVar() {
 }
@@ -66,53 +65,56 @@ std::string DiffVar::DiffDump(int tab) {
             break;
         }
         default:
+            LOG_ERROR("unknown type %d", m_type);
             ret = "unknown";
     }
 
     return ret;
 }
 
-DiffVarInterface *DiffVar::DiffNew() {
-    auto ret = DiffVarPoolAlloc();
-    ret->m_type = DT_NIL;
-    ret->m_integer = 0;
-    ret->m_number = 0;
-    ret->m_boolean = false;
-    ret->m_string.clear();
-    ret->m_table.clear();
-    return ret;
+DiffVarInterface *DiffVar::DiffSetNil() {
+    m_type = DT_NIL;
+    return this;
 }
 
-void DiffVar::DiffSetTable() {
+DiffVarInterface *DiffVar::DiffSetTable() {
     m_type = DT_TABLE;
+    m_table.clear();
+    return this;
 }
 
-void DiffVar::DiffSetString(const char *s, size_t len) {
+DiffVarInterface *DiffVar::DiffSetString(const char *s, size_t len) {
     m_type = DT_STRING;
     m_string = std::string(s, len);
+    return this;
 }
 
-void DiffVar::DiffSetInteger(int64_t i) {
+DiffVarInterface *DiffVar::DiffSetInteger(int64_t i) {
     m_type = DT_INTEGER;
     m_integer = i;
+    return this;
 }
 
-void DiffVar::DiffSetNumber(double n) {
+DiffVarInterface *DiffVar::DiffSetNumber(double n) {
     m_type = DT_NUMBER;
     m_number = n;
+    return this;
 }
 
-void DiffVar::DiffSetBoolean(bool b) {
+DiffVarInterface *DiffVar::DiffSetBoolean(bool b) {
     m_type = DT_BOOLEAN;
     m_boolean = b;
+    return this;
 }
 
-void DiffVar::DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) {
+DiffVarInterface *DiffVar::DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) {
     m_table[k] = v;
+    return this;
 }
 
 const char *DiffVar::DiffGetString(size_t &len) {
     if (m_type != DT_STRING) {
+        LOG_ERROR("type is not string");
         len = 0;
         return "";
     }
@@ -122,6 +124,7 @@ const char *DiffVar::DiffGetString(size_t &len) {
 
 int64_t DiffVar::DiffGetInteger() {
     if (m_type != DT_INTEGER) {
+        LOG_ERROR("type is not integer");
         return 0;
     }
     return m_integer;
@@ -129,6 +132,7 @@ int64_t DiffVar::DiffGetInteger() {
 
 double DiffVar::DiffGetNumber() {
     if (m_type != DT_NUMBER) {
+        LOG_ERROR("type is not number");
         return 0;
     }
     return m_number;
@@ -136,6 +140,7 @@ double DiffVar::DiffGetNumber() {
 
 bool DiffVar::DiffGetBoolean() {
     if (m_type != DT_BOOLEAN) {
+        LOG_ERROR("type is not boolean");
         return false;
     }
     return m_boolean;
@@ -209,6 +214,7 @@ bool DiffVar::DiffEqual(DiffVarInterface *other) {
             return this == other;
         }
         default:
+            LOG_ERROR("unknown type %d", m_type);
             return false;
     }
 }
@@ -223,7 +229,10 @@ size_t DiffVar::DiffHash() {
             return std::hash<double>()(m_number);
         case DT_BOOLEAN:
             return std::hash<bool>()(m_boolean);
+        case DT_TABLE:
+            return std::hash<DiffVar *>()(this);
         default:
+            LOG_ERROR("unknown type %d", m_type);
             return 0;
     }
 }
@@ -269,19 +278,78 @@ private:
 DiffVarPool g_diff_var_pool;
 
 extern "C" DiffVar *DiffVarPoolAlloc() {
-    return g_diff_var_pool.Alloc();
+    auto ret = g_diff_var_pool.Alloc();
+    ret->DiffSetNil();
+    return ret;
 }
 
 extern "C" void DiffVarPoolReset(DiffVar *var) {
     g_diff_var_pool.Reset();
 }
 
-static DiffVarInterface *table_diff(DiffVarInterface *src, DiffVarInterface *dst) {
-    auto ret = dst->DiffNew();
-    ret->DiffSetTable();
+static bool IsArrayHasId(DiffVarInterface *arr, DiffArrayElementGetIdFunc get_id_func) {
+    int i = 0;
+    auto it = arr->DiffGetTableIterator();
+    while (it->Next()) {
+        auto k = it->Key();
+        auto v = it->Value();
 
-    auto del = dst->DiffNew();
-    del->DiffSetTable();
+        if (k->GetDiffType() != DT_INTEGER) {
+            return false;
+        }
+
+        if (k->DiffGetInteger() != i) {
+            return false;
+        }
+
+        if (v->GetDiffType() != DT_TABLE) {
+            return false;
+        }
+
+        auto id = get_id_func(v);
+        if (!id) {
+            return false;
+        }
+
+        ++i;
+    }
+    return true;
+}
+
+static DiffVarInterface *
+ArrayToMap(DiffVarInterface *arr, DiffArrayElementGetIdFunc get_id_func, DiffVarNewFunc new_func) {
+    auto ret = new_func()->DiffSetTable();
+
+    auto it = arr->DiffGetTableIterator();
+    while (it->Next()) {
+        auto v = it->Value();
+        auto id = get_id_func(v);
+        ret->DiffSetTableKeyValue(id, v);
+    }
+
+    return ret;
+}
+
+extern "C" DiffVarInterface *
+CalDiff(DiffVarInterface *src, DiffVarInterface *dst, DiffArrayElementGetIdFunc get_id_func, DiffVarNewFunc new_func) {
+    LOG_DEBUG("start CalDiff src is %s", src->DiffDump().c_str());
+    LOG_DEBUG("start CalDiff input is %s", dst->DiffDump().c_str());
+
+    if (src->GetDiffType() != DT_TABLE || dst->GetDiffType() != DT_TABLE) {
+        LOG_DEBUG("diff is simple now %s", dst->DiffDump().c_str());
+        return dst;
+    }
+
+    auto diff = new_func()->DiffSetTable();
+
+    auto del = new_func()->DiffSetTable();
+
+    if (IsArrayHasId(src, get_id_func) && IsArrayHasId(dst, get_id_func)) {
+        src = ArrayToMap(src, get_id_func, new_func);
+        dst = ArrayToMap(dst, get_id_func, new_func);
+        diff->DiffSetTableKeyValue(new_func()->DiffSetString("__diff_lua_array", strlen("__diff_lua_array")),
+                                   new_func()->DiffSetBoolean(true));
+    }
 
     auto it = src->DiffGetTableIterator();
     while (it->Next()) {
@@ -290,20 +358,16 @@ static DiffVarInterface *table_diff(DiffVarInterface *src, DiffVarInterface *dst
 
         auto dst_v = dst->DiffGetTableValue(k);
         if (!dst_v) {
-            auto dst_v = dst->DiffNew();
-            dst_v->DiffSetInteger(0);
-            del->DiffSetTableKeyValue(k, dst_v);
+            del->DiffSetTableKeyValue(new_func()->DiffSetInteger(del->DiffGetTableSize() + 1), dst_v);
         } else {
-            auto v_is_table = v->GetDiffType() == DT_TABLE;
-            auto dst_v_is_table = dst_v->GetDiffType() == DT_TABLE;
-            if (v_is_table && dst_v_is_table) {
-                auto sub_diff = table_diff(v, dst_v);
+            if (v->GetDiffType() == DT_TABLE && dst_v->GetDiffType() == DT_TABLE) {
+                auto sub_diff = CalDiff(v, dst_v, get_id_func, new_func);
                 if (sub_diff->DiffGetTableSize() > 0) {
-                    ret->DiffSetTableKeyValue(k, sub_diff);
+                    diff->DiffSetTableKeyValue(k, sub_diff);
                 }
             } else {
                 if (!v->DiffEqual(dst_v)) {
-                    ret->DiffSetTableKeyValue(k, dst_v);
+                    diff->DiffSetTableKeyValue(k, dst_v);
                 }
             }
         }
@@ -316,37 +380,15 @@ static DiffVarInterface *table_diff(DiffVarInterface *src, DiffVarInterface *dst
 
         auto src_v = src->DiffGetTableValue(k);
         if (!src_v) {
-            ret->DiffSetTableKeyValue(k, v);
+            diff->DiffSetTableKeyValue(k, v);
         }
     }
 
     if (del->DiffGetTableSize() > 0) {
-        auto k = dst->DiffNew();
-        k->DiffSetString("__diff_lua_del", strlen("__diff_lua_del"));
-        ret->DiffSetTableKeyValue(k, del);
+        diff->DiffSetTableKeyValue(new_func()->DiffSetString("__diff_lua_del", strlen("__diff_lua_del")), del);
     }
 
-    return ret;
-}
+    LOG_DEBUG("end CalDiff output is %s", diff->DiffDump().c_str());
 
-extern "C" DiffVarInterface *calc_env_diff(DiffLoggerInterface *log, DiffVarInterface *src, DiffVarInterface *input) {
-    if (!src || !input) {
-        LOG_ERROR("invalid param");
-        return 0;
-    }
-
-    LOG_DEBUG("start calc_env_diff src is %s", src->DiffDump().c_str());
-
-    auto cur_type = src->GetDiffType();
-    auto input_type = input->GetDiffType();
-    auto cur_is_table = cur_type == DT_TABLE;
-    auto input_is_table = input_type == DT_TABLE;
-
-    if (cur_is_table && input_is_table) {
-        LOG_DEBUG("src and input are both table, need diff");
-        return table_diff(src, input);
-    } else {
-        LOG_DEBUG("diff is simple now %s", input->DiffDump().c_str());
-        return input;
-    }
+    return diff;
 }

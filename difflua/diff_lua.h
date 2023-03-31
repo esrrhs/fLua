@@ -5,6 +5,7 @@
 #include <cstring>
 #include <string>
 #include <unordered_map>
+#include <functional>
 #include "lua.hpp"
 
 enum DiffType {
@@ -25,26 +26,26 @@ public:
     // 打印变量信息，用于调试
     virtual std::string DiffDump(int tab = 0) = 0;
 
-    // 生成一个新的变量nil
-    virtual DiffVarInterface *DiffNew() = 0;
+    // 设置为Nil
+    virtual DiffVarInterface *DiffSetNil() = 0;
 
     // 设置为Table
-    virtual void DiffSetTable() = 0;
+    virtual DiffVarInterface *DiffSetTable() = 0;
 
     // 设置为string
-    virtual void DiffSetString(const char *s, size_t len) = 0;
+    virtual DiffVarInterface *DiffSetString(const char *s, size_t len) = 0;
 
     // 设置为integer
-    virtual void DiffSetInteger(int64_t i) = 0;
+    virtual DiffVarInterface *DiffSetInteger(int64_t i) = 0;
 
     // 设置为number
-    virtual void DiffSetNumber(double n) = 0;
+    virtual DiffVarInterface *DiffSetNumber(double n) = 0;
 
     // 设置为boolean
-    virtual void DiffSetBoolean(bool b) = 0;
+    virtual DiffVarInterface *DiffSetBoolean(bool b) = 0;
 
     // 设置table的k v
-    virtual void DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) = 0;
+    virtual DiffVarInterface *DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) = 0;
 
     // 拿到string
     virtual const char *DiffGetString(size_t &len) = 0;
@@ -109,19 +110,19 @@ public:
 
     virtual std::string DiffDump(int tab = 0) override;
 
-    virtual DiffVarInterface *DiffNew() override;
+    virtual DiffVarInterface *DiffSetNil() override;
 
-    virtual void DiffSetTable() override;
+    virtual DiffVarInterface *DiffSetTable() override;
 
-    virtual void DiffSetString(const char *s, size_t len) override;
+    virtual DiffVarInterface *DiffSetString(const char *s, size_t len) override;
 
-    virtual void DiffSetInteger(int64_t i) override;
+    virtual DiffVarInterface *DiffSetInteger(int64_t i) override;
 
-    virtual void DiffSetNumber(double n) override;
+    virtual DiffVarInterface *DiffSetNumber(double n) override;
 
-    virtual void DiffSetBoolean(bool b) override;
+    virtual DiffVarInterface *DiffSetBoolean(bool b) override;
 
-    virtual void DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) override;
+    virtual DiffVarInterface *DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) override;
 
     virtual const char *DiffGetString(size_t &len) override;
 
@@ -175,20 +176,11 @@ extern "C" DiffVar *DiffVarPoolAlloc();
 // 释放池子中所有DiffVar
 extern "C" void DiffVarPoolReset(DiffVar *var);
 
-class DiffLoggerInterface {
-public:
-    enum LogLevel {
-        DEBUG,
-        INFO,
-        ERROR,
-        INVALID,
-    };
+typedef std::function<DiffVarInterface *()> DiffVarNewFunc;
 
-    virtual LogLevel Level() = 0;
-
-    virtual void Log(LogLevel level, const char *file, int line, const char *func, const char *msg) = 0;
-};
+typedef std::function<DiffVarInterface *(DiffVarInterface *element)> DiffArrayElementGetIdFunc;
 
 // 计算差分，确保env同时只被一个线程使用
-// input为输入，diff为输出
-extern "C" DiffVarInterface *calc_env_diff(DiffLoggerInterface *log, DiffVarInterface *cur, DiffVarInterface *input);
+// 返回src->dst的diff
+extern "C" DiffVarInterface *
+CalDiff(DiffVarInterface *src, DiffVarInterface *dst, DiffArrayElementGetIdFunc get_id_func, DiffVarNewFunc new_func);
