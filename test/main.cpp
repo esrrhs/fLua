@@ -13,16 +13,19 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    auto env = new_diff_env();
     MyLogger logger;
 
-    auto input = std::make_shared<DiffVar>();
-    auto diff = calc_env_diff(env, &logger, input);
+    auto src = DiffVarPoolAlloc();
+    auto input = DiffVarPoolAlloc();
+    auto diff = calc_env_diff(&logger, src, input);
     if (!diff) {
         printf("calc_env_diff failed\n");
         return -1;
     }
 
-    free_diff_env(env);
+    auto diff_str = diff->DiffDump(0);
+    printf("diff is %s", diff_str.c_str());
+
+    DiffVarPoolReset(src);
     return 0;
 }

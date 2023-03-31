@@ -16,229 +16,149 @@ enum DiffType {
     DT_TABLE,
 };
 
-class DiffVarInterface;
-
-typedef std::shared_ptr<DiffVarInterface> DiffVarInterfacePtr;
-
-// 用于表达树形结构的变量，不可成环
+// 用于表达树形结构的变量，不可成环。与lua的变量类型对应
 class DiffVarInterface {
 public:
     // 获取变量类型
-    virtual DiffType Type() = 0;
+    virtual DiffType GetDiffType() = 0;
 
     // 打印变量信息，用于调试
-    virtual std::string Dump(int tab = 0) = 0;
+    virtual std::string DiffDump(int tab = 0) = 0;
 
-    // 从另一个变量复制一份
-    // 返回0表示成功，否则失败
-    virtual int CloneFrom(DiffVarInterfacePtr other) = 0;
+    // 生成一个新的变量nil
+    virtual DiffVarInterface *DiffNew() = 0;
 
-    // 生成一个新的变量Table
-    virtual DiffVarInterfacePtr NewTable() = 0;
+    // 设置为Table
+    virtual void DiffSetTable() = 0;
 
-    // 生成一个新的变量string
-    virtual DiffVarInterfacePtr NewString(const char *s, size_t len) = 0;
+    // 设置为string
+    virtual void DiffSetString(const char *s, size_t len) = 0;
 
-    // 生成一个新的变量integer
-    virtual DiffVarInterfacePtr NewInteger(int64_t i) = 0;
+    // 设置为integer
+    virtual void DiffSetInteger(int64_t i) = 0;
 
-    // 生成一个新的变量number
-    virtual DiffVarInterfacePtr NewNumber(double n) = 0;
+    // 设置为number
+    virtual void DiffSetNumber(double n) = 0;
 
-    // 生成一个新的变量boolean
-    virtual DiffVarInterfacePtr NewBoolean(bool b) = 0;
+    // 设置为boolean
+    virtual void DiffSetBoolean(bool b) = 0;
+
+    // 设置table的k v
+    virtual void DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) = 0;
+
+    // 拿到string
+    virtual const char *DiffGetString(size_t &len) = 0;
+
+    // 拿到integer
+    virtual int64_t DiffGetInteger() = 0;
+
+    // 拿到number
+    virtual double DiffGetNumber() = 0;
+
+    // 拿到boolean
+    virtual bool DiffGetBoolean() = 0;
+
+    // 通过k获取table的v
+    virtual DiffVarInterface *DiffGetTableValue(DiffVarInterface *k) = 0;
+
+    // 获取kv数量
+    virtual size_t DiffGetTableSize() = 0;
 
     // 迭代器
-    class TableIterator {
+    class DiffTableIterator {
     public:
-        virtual DiffVarInterfacePtr Key() = 0;
+        virtual DiffVarInterface *Key() = 0;
 
-        virtual DiffVarInterfacePtr Value() = 0;
+        virtual DiffVarInterface *Value() = 0;
 
         virtual bool Next() = 0;
     };
 
-    typedef std::shared_ptr<TableIterator> TableIteratorPtr;
-
-    // 设置table的k v
-    virtual void SetTableKeyValue(DiffVarInterfacePtr k, DiffVarInterfacePtr v) = 0;
-
-    // 通过k获取table的v
-    virtual DiffVarInterfacePtr GetTableValue(DiffVarInterfacePtr k) = 0;
-
-    // 获取kv数量
-    virtual size_t GetTableSize() = 0;
+    typedef std::shared_ptr<DiffTableIterator> DiffTableIteratorPtr;
 
     // 获取迭代器，用来遍历table
-    virtual TableIteratorPtr GetTableIterator() = 0;
+    virtual DiffTableIteratorPtr DiffGetTableIterator() = 0;
 
-    // 判断是否相同
-    virtual bool Equal(DiffVarInterfacePtr other) = 0;
+    // 判断是否相同，采用Lua的规则
+    virtual bool DiffEqual(DiffVarInterface *other) = 0;
 
     // 获取Hash值
-    virtual size_t Hash() = 0;
+    virtual size_t DiffHash() = 0;
 };
 
 // 通用的DiffVar实现，也可以自己实现一种结构来对接
 class DiffVar : public DiffVarInterface {
 public:
-    DiffVar() {
-    }
-
-    virtual ~DiffVar() {
-    }
-
-    virtual DiffType Type() override {
-        return m_type;
-    }
-
-    virtual std::string Dump(int tab = 0) override {
-        std::string ret;
-
-        switch (m_type) {
-            case DT_NIL:
-                ret = "nil";
-                break;
-            case DT_INTEGER:
-                ret = std::to_string(m_integer);
-                break;
-            case DT_NUMBER:
-                ret = std::to_string(m_number);
-                break;
-            case DT_BOOLEAN:
-                ret = m_boolean ? "true" : "false";
-                break;
-            case DT_STRING:
-                ret = m_string;
-                break;
-            case DT_TABLE:
-                std::string tabstr;
-                for (int i = 0; i < tab; ++i) {
-                    tabstr += " ";
-                }
-                for (const auto it: m_table) {
-                    ret += "table:\n";
-                    ret += tabstr + it.first->Dump(tab + 4) + "->" + it.second->Dump(tab + 4) + "\n";
-                }
-                break;
-        }
-        return ret;
-    }
-
-    virtual int CloneFrom(DiffVarInterfacePtr other) override {
-        // TODO
-        m_type = other->Type();
-        return 0;
-    }
-
-    virtual DiffVarInterfacePtr NewTable() override {
-        auto ret = std::make_shared<DiffVar>();
-        ret->m_type = DT_TABLE;
-        return ret;
-    }
-
-    // 生成一个新的变量string
-    virtual DiffVarInterfacePtr NewString(const char *s, size_t len) override {
-        auto ret = std::make_shared<DiffVar>();
-        ret->m_type = DT_STRING;
-        ret->m_string.assign(s, len);
-        return ret;
-    }
-
-    // 生成一个新的变量integer
-    virtual DiffVarInterfacePtr NewInteger(int64_t i) override {
-        auto ret = std::make_shared<DiffVar>();
-        ret->m_type = DT_INTEGER;
-        ret->m_integer = i;
-        return ret;
-    }
-
-    // 生成一个新的变量number
-    virtual DiffVarInterfacePtr NewNumber(double n) override {
-        auto ret = std::make_shared<DiffVar>();
-        ret->m_type = DT_NUMBER;
-        ret->m_number = n;
-        return ret;
-    }
-
-    // 生成一个新的变量boolean
-    virtual DiffVarInterfacePtr NewBoolean(bool b) override {
-        auto ret = std::make_shared<DiffVar>();
-        ret->m_type = DT_BOOLEAN;
-        ret->m_boolean = b;
-        return ret;
-    }
-
-    // 迭代器
-    class DiffVarTableIterator : public TableIterator {
-    public:
-        virtual DiffVarInterfacePtr Key() override {
-
-        }
-
-        virtual DiffVarInterfacePtr Value() override {
-
-        }
-
-        virtual bool Next() override {
-
-        }
-    };
-
-    typedef std::shared_ptr<DiffVarTableIterator> DiffVarTableIteratorPtr;
-
-    // 设置table的k v
-    virtual void SetTableKeyValue(DiffVarInterfacePtr k, DiffVarInterfacePtr v) override {
-
-    }
-
-    // 通过k获取table的v
-    virtual DiffVarInterfacePtr GetTableValue(DiffVarInterfacePtr k) override {
-
-    }
-
-    // 获取kv数量
-    virtual size_t GetTableSize() override {
-
-    }
-
-    // 获取迭代器，用来遍历table
-    virtual TableIteratorPtr GetTableIterator() override {
-
-    }
-
-    // 判断是否相同
-    virtual bool Equal(DiffVarInterfacePtr other) override {
-
-    }
-
-    virtual size_t Hash() override {
-        switch (m_type) {
-            case DT_STRING:
-                return std::hash<std::string>()(m_string);
-            case DT_INTEGER:
-                return std::hash<int64_t>()(m_integer);
-            case DT_NUMBER:
-                return std::hash<double>()(m_number);
-            case DT_BOOLEAN:
-                return std::hash<bool>()(m_boolean);
-            default:
-                return 0;
-        }
-    }
-
-
     struct DiffVarInterfacePtrHash {
-        size_t operator()(const DiffVarInterfacePtr &p) const {
-            return p->Hash();
+        size_t operator()(DiffVarInterface *p) const {
+            return p->DiffHash();
         }
     };
 
     struct DiffVarInterfacePtrEqual {
-        bool operator()(const DiffVarInterfacePtr &left, const DiffVarInterfacePtr &right) const {
-            return left->Equal(right);
+        bool operator()(DiffVarInterface *left, DiffVarInterface *right) const {
+            return left->DiffEqual(right);
         }
     };
+
+    DiffVar();
+
+    virtual ~DiffVar();
+
+    virtual DiffType GetDiffType() override;
+
+    virtual std::string DiffDump(int tab = 0) override;
+
+    virtual DiffVarInterface *DiffNew() override;
+
+    virtual void DiffSetTable() override;
+
+    virtual void DiffSetString(const char *s, size_t len) override;
+
+    virtual void DiffSetInteger(int64_t i) override;
+
+    virtual void DiffSetNumber(double n) override;
+
+    virtual void DiffSetBoolean(bool b) override;
+
+    virtual void DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) override;
+
+    virtual const char *DiffGetString(size_t &len) override;
+
+    virtual int64_t DiffGetInteger() override;
+
+    virtual double DiffGetNumber() override;
+
+    virtual bool DiffGetBoolean() override;
+
+    virtual DiffVarInterface *DiffGetTableValue(DiffVarInterface *k) override;
+
+    virtual size_t DiffGetTableSize() override;
+
+    class DiffVarTableIterator : public DiffTableIterator {
+    public:
+        DiffVarTableIterator(
+                std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator it,
+                std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator end);
+
+        virtual DiffVarInterface *Key() override;
+
+        virtual DiffVarInterface *Value() override;
+
+        virtual bool Next() override;
+
+    private:
+        friend class DiffVar;
+
+        std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator m_it;
+        std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator m_end;
+    };
+
+    virtual DiffTableIteratorPtr DiffGetTableIterator() override;
+
+    virtual bool DiffEqual(DiffVarInterface *other) override;
+
+    virtual size_t DiffHash() override;
 
 private:
     DiffType m_type = DT_NIL;
@@ -246,10 +166,14 @@ private:
     int64_t m_integer = 0;
     double m_number = 0;
     bool m_boolean = false;
-    std::unordered_map<DiffVarInterfacePtr, DiffVarInterfacePtr, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual> m_table;
+    std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual> m_table;
 };
 
-class DiffEnv;
+// 从池子中分配一个DiffVar
+extern "C" DiffVar *DiffVarPoolAlloc();
+
+// 释放池子中所有DiffVar
+extern "C" void DiffVarPoolReset(DiffVar *var);
 
 class DiffLoggerInterface {
 public:
@@ -265,15 +189,6 @@ public:
     virtual void Log(LogLevel level, const char *file, int line, const char *func, const char *msg) = 0;
 };
 
-// 生成上下文，用于计算差分
-extern "C" DiffEnv *new_diff_env();
-
-// 重置上下文，清空内部状态，用于重新计算差分
-extern "C" void reset_env(DiffEnv *env, DiffLoggerInterface *log);
-
 // 计算差分，确保env同时只被一个线程使用
 // input为输入，diff为输出
-extern "C" DiffVarInterfacePtr calc_env_diff(DiffEnv *env, DiffLoggerInterface *log, DiffVarInterfacePtr input);
-
-// 释放上下文
-extern "C" void free_diff_env(DiffEnv *env);
+extern "C" DiffVarInterface *calc_env_diff(DiffLoggerInterface *log, DiffVarInterface *cur, DiffVarInterface *input);
