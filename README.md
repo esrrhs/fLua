@@ -134,4 +134,10 @@ local new_dst = lua_patch(src, diff, get_id)
 ```
 
 ### CPP使用
-TODO
+参考[main.cpp](./test/main.cpp)中的示例，使用方式：
+```cpp
+#include "diff_lua.h"
+
+auto diff = CalDiff(src, dst, get_id, new_func);
+```
+输出结果与Lua一致
