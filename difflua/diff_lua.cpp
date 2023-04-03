@@ -8,7 +8,7 @@
     { \
         char buf[1024] = {0}; \
         snprintf(buf,1024,fmt,##__VA_ARGS__); \
-        printf("[%s] %s:%d %s %s","ERROR",__FILE__,__LINE__,__FUNCTION__,buf); \
+        printf("[%s] %s:%d %s %s\n","ERROR",__FILE__,__LINE__,__FUNCTION__,buf); \
     } \
 } while(0)
 
@@ -16,7 +16,7 @@
     { \
         char buf[1024] = {0}; \
         snprintf(buf,1024,fmt,##__VA_ARGS__); \
-        printf("[%s] %s:%d %s %s","DEBUG",__FILE__,__LINE__,__FUNCTION__,buf); \
+        printf("[%s] %s:%d %s %s\n","DEBUG",__FILE__,__LINE__,__FUNCTION__,buf); \
     } \
 } while(0)
 #else
@@ -58,8 +58,8 @@ std::string DiffVar::DiffDump(int tab) {
             for (int i = 0; i < tab; ++i) {
                 tabstr += " ";
             }
+            ret += "table:\n";
             for (const auto it: m_table) {
-                ret += "table:\n";
                 ret += tabstr + it.first->DiffDump(tab + 4) + "->" + it.second->DiffDump(tab + 4) + "\n";
             }
             break;
@@ -108,6 +108,10 @@ DiffVarInterface *DiffVar::DiffSetBoolean(bool b) {
 }
 
 DiffVarInterface *DiffVar::DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) {
+    if (m_type != DT_TABLE) {
+        LOG_ERROR("type is not table");
+        return this;
+    }
     m_table[k] = v;
     return this;
 }
@@ -147,6 +151,10 @@ bool DiffVar::DiffGetBoolean() {
 }
 
 DiffVarInterface *DiffVar::DiffGetTableValue(DiffVarInterface *k) {
+    if (m_type != DT_TABLE) {
+        LOG_ERROR("type is not table");
+        return nullptr;
+    }
     auto it = m_table.find(k);
     if (it == m_table.end()) {
         return nullptr;

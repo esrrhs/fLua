@@ -2,8 +2,17 @@
 #include "stdio.h"
 
 int main(int argc, char *argv[]) {
-    auto src = DiffVarPoolAlloc();
-    auto input = DiffVarPoolAlloc();
+
+    auto get_id = [](DiffVarInterface *v) {
+        return v->DiffGetTableValue(DiffVarPoolAlloc()->DiffSetString("id", 2));
+    };
+
+    auto new_func = []() {
+        return DiffVarPoolAlloc();
+    };
+
+    auto src = new_func()->DiffSetTable();
+    auto input = new_func()->DiffSetTable();
 
     /*
     local src = {
@@ -26,20 +35,82 @@ int main(int argc, char *argv[]) {
         }
     }
      * */
-    src->DiffSetTableKeyValue(src->DiffSetString("a", 1), src->DiffSetInteger(1));
-    src->DiffSetTableKeyValue(src->DiffSetString("b", 1), src->DiffSetString("2", 1));
-    src->DiffSetTableKeyValue(src->DiffSetString("c", 1), src->DiffSetNumber(3.3));
-    src->DiffSetTableKeyValue(src->DiffSetString("d", 1), src->DiffSetBoolean(true));
-    src->DiffSetTableKeyValue(src->DiffSetString("sub", 3), src->DiffSetTable());
+    src->DiffSetTableKeyValue(new_func()->DiffSetString("a", 1), new_func()->DiffSetInteger(1));
+    src->DiffSetTableKeyValue(new_func()->DiffSetString("b", 1), new_func()->DiffSetString("2", 1));
+    src->DiffSetTableKeyValue(new_func()->DiffSetString("c", 1), new_func()->DiffSetNumber(3.3));
+    src->DiffSetTableKeyValue(new_func()->DiffSetString("d", 1), new_func()->DiffSetBoolean(true));
 
+    src->DiffSetTableKeyValue(new_func()->DiffSetString("sub", 3), new_func()->DiffSetTable());
+    src->DiffGetTableValue(new_func()->DiffSetString("sub", 3))->DiffSetTableKeyValue(new_func()->DiffSetString("a", 1),
+                                                                                      new_func()->DiffSetInteger(11));
+    src->DiffGetTableValue(new_func()->DiffSetString("sub", 3))->DiffSetTableKeyValue(new_func()->DiffSetString("b", 1),
+                                                                                      new_func()->DiffSetString("22",
+                                                                                                                2));
+    src->DiffGetTableValue(new_func()->DiffSetString("sub", 3))->DiffSetTableKeyValue(new_func()->DiffSetString("c", 1),
+                                                                                      new_func()->DiffSetNumber(33.3));
+    src->DiffGetTableValue(new_func()->DiffSetString("sub", 3))->DiffSetTableKeyValue(new_func()->DiffSetString("d", 1),
+                                                                                      new_func()->DiffSetBoolean(true));
 
-    auto get_id = [](DiffVarInterface *v) {
-        return v->DiffGetTableValue(DiffVarPoolAlloc()->DiffSetString("id", 2));
-    };
+    src->DiffSetTableKeyValue(new_func()->DiffSetString("array", 5), new_func()->DiffSetTable());
+    src->DiffGetTableValue(new_func()->DiffSetString("array", 5))->DiffSetTableKeyValue(new_func()->DiffSetInteger(1),
+                                                                                        new_func()->DiffSetInteger(1));
+    src->DiffGetTableValue(new_func()->DiffSetString("array", 5))->DiffSetTableKeyValue(new_func()->DiffSetInteger(2),
+                                                                                        new_func()->DiffSetInteger(2));
+    src->DiffGetTableValue(new_func()->DiffSetString("array", 5))->DiffSetTableKeyValue(new_func()->DiffSetInteger(3),
+                                                                                        new_func()->DiffSetInteger(3));
+    src->DiffGetTableValue(new_func()->DiffSetString("array", 5))->DiffSetTableKeyValue(new_func()->DiffSetInteger(4),
+                                                                                        new_func()->DiffSetInteger(4));
 
-    auto new_func = []() {
-        return DiffVarPoolAlloc();
-    };
+    src->DiffSetTableKeyValue(new_func()->DiffSetString("obj_array", 9), new_func()->DiffSetTable());
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffSetTableKeyValue(
+            new_func()->DiffSetInteger(1), new_func()->DiffSetTable());
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(1))->DiffSetTableKeyValue(new_func()->DiffSetString("id", 2),
+                                                                 new_func()->DiffSetInteger(1));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(1))->DiffSetTableKeyValue(new_func()->DiffSetString("a", 1),
+                                                                 new_func()->DiffSetInteger(1));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(1))->DiffSetTableKeyValue(new_func()->DiffSetString("b", 1),
+                                                                 new_func()->DiffSetInteger(2));
+
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffSetTableKeyValue(
+            new_func()->DiffSetInteger(2), new_func()->DiffSetTable());
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(2))->DiffSetTableKeyValue(new_func()->DiffSetString("id", 2),
+                                                                 new_func()->DiffSetInteger(2));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(2))->DiffSetTableKeyValue(new_func()->DiffSetString("a", 1),
+                                                                 new_func()->DiffSetInteger(3));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(2))->DiffSetTableKeyValue(new_func()->DiffSetString("b", 1),
+                                                                 new_func()->DiffSetInteger(4));
+
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffSetTableKeyValue(
+            new_func()->DiffSetInteger(3), new_func()->DiffSetTable());
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(3))->DiffSetTableKeyValue(new_func()->DiffSetString("id", 2),
+                                                                 new_func()->DiffSetInteger(3));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(3))->DiffSetTableKeyValue(new_func()->DiffSetString("a", 1),
+                                                                 new_func()->DiffSetInteger(5));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(3))->DiffSetTableKeyValue(new_func()->DiffSetString("b", 1),
+                                                                 new_func()->DiffSetInteger(6));
+
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffSetTableKeyValue(
+            new_func()->DiffSetInteger(4), new_func()->DiffSetTable());
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(4))->DiffSetTableKeyValue(new_func()->DiffSetString("id", 2),
+                                                                 new_func()->DiffSetInteger(4));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(4))->DiffSetTableKeyValue(new_func()->DiffSetString("a", 1),
+                                                                 new_func()->DiffSetInteger(7));
+    src->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
+            new_func()->DiffSetInteger(4))->DiffSetTableKeyValue(new_func()->DiffSetString("b", 1),
+                                                                 new_func()->DiffSetInteger(8));
+
+    printf("src is %s\n", src->DiffDump(0).c_str());
 
     auto diff = CalDiff(src, input, get_id, new_func);
     if (!diff) {
@@ -50,6 +121,5 @@ int main(int argc, char *argv[]) {
     auto diff_str = diff->DiffDump(0);
     printf("diff is %s", diff_str.c_str());
 
-    DiffVarPoolReset(src);
     return 0;
 }
