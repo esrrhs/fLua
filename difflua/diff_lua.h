@@ -154,6 +154,8 @@ public:
 
         std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator m_it;
         std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator m_end;
+        DiffVarInterface *m_key = nullptr;
+        DiffVarInterface *m_value = nullptr;
     };
 
     virtual DiffTableIteratorPtr DiffGetTableIterator() override;

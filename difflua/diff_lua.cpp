@@ -195,17 +195,19 @@ DiffVar::DiffVarTableIterator::DiffVarTableIterator(
 }
 
 DiffVarInterface *DiffVar::DiffVarTableIterator::Key() {
-    return m_it->first;
+    return m_key;
 }
 
 DiffVarInterface *DiffVar::DiffVarTableIterator::Value() {
-    return m_it->second;
+    return m_value;
 }
 
 bool DiffVar::DiffVarTableIterator::Next() {
     if (m_it == m_end) {
         return false;
     }
+    m_key = m_it->first;
+    m_value = m_it->second;
     ++m_it;
     return true;
 }
@@ -317,7 +319,7 @@ extern "C" void DiffVarPoolReset(DiffVar *var) {
 }
 
 static bool IsArrayHasId(DiffVarInterface *arr, DiffArrayElementGetIdFunc get_id_func) {
-    int i = 0;
+    int i = 1;
     auto it = arr->DiffGetTableIterator();
     while (it->Next()) {
         auto k = it->Key();
@@ -387,7 +389,7 @@ CalDiff(DiffVarInterface *src, DiffVarInterface *dst, DiffArrayElementGetIdFunc 
 
         auto dst_v = dst->DiffGetTableValue(k);
         if (!dst_v) {
-            del->DiffSetTableKeyValue(new_func()->DiffSetInteger(del->DiffGetTableSize() + 1), dst_v);
+            del->DiffSetTableKeyValue(new_func()->DiffSetInteger(del->DiffGetTableSize() + 1), k);
         } else {
             if (v->GetDiffType() == DT_TABLE && dst_v->GetDiffType() == DT_TABLE) {
                 auto sub_diff = CalDiff(v, dst_v, get_id_func, new_func);
