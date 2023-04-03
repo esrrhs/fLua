@@ -4,6 +4,7 @@
 #include <memory>
 #include <cstring>
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <functional>
 #include "lua.hpp"
@@ -139,8 +140,8 @@ public:
     class DiffVarTableIterator : public DiffTableIterator {
     public:
         DiffVarTableIterator(
-                std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator it,
-                std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator end);
+                std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator it,
+                std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator end);
 
         virtual DiffVarInterface *Key() override;
 
@@ -151,8 +152,8 @@ public:
     private:
         friend class DiffVar;
 
-        std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator m_it;
-        std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual>::iterator m_end;
+        std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator m_it;
+        std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator m_end;
     };
 
     virtual DiffTableIteratorPtr DiffGetTableIterator() override;
@@ -168,6 +169,7 @@ private:
     double m_number = 0;
     bool m_boolean = false;
     std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVarInterfacePtrHash, DiffVarInterfacePtrEqual> m_table;
+    std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>> m_vec;
 };
 
 // 从池子中分配一个DiffVar

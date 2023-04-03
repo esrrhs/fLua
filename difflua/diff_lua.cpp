@@ -59,7 +59,7 @@ std::string DiffVar::DiffDump(int tab) {
                 tabstr += " ";
             }
             ret += "table:\n";
-            for (const auto it: m_table) {
+            for (const auto it: m_vec) {
                 ret += tabstr + it.first->DiffDump(tab + 4) + "->" + it.second->DiffDump(tab + 4) + "\n";
             }
             break;
@@ -112,7 +112,28 @@ DiffVarInterface *DiffVar::DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInte
         LOG_ERROR("type is not table");
         return this;
     }
-    m_table[k] = v;
+
+    if (v->GetDiffType() == DT_NIL) {
+        auto it = m_table.find(k);
+        if (it != m_table.end()) {
+            for (auto it = m_vec.begin(); it != m_vec.end(); ++it) {
+                if (it->first == k) {
+                    m_vec.erase(it);
+                    break;
+                }
+            }
+            m_table.erase(it);
+        }
+        return this;
+    }
+
+    auto it = m_table.find(k);
+    if (it != m_table.end()) {
+        it->second = v;
+    } else {
+        m_table[k] = v;
+        m_vec.push_back(std::make_pair(k, v));
+    }
     return this;
 }
 
@@ -167,8 +188,8 @@ size_t DiffVar::DiffGetTableSize() {
 }
 
 DiffVar::DiffVarTableIterator::DiffVarTableIterator(
-        std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVar::DiffVarInterfacePtrHash, DiffVar::DiffVarInterfacePtrEqual>::iterator it,
-        std::unordered_map<DiffVarInterface *, DiffVarInterface *, DiffVar::DiffVarInterfacePtrHash, DiffVar::DiffVarInterfacePtrEqual>::iterator end) {
+        std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator it,
+        std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator end) {
     m_it = it;
     m_end = end;
 }
@@ -190,7 +211,7 @@ bool DiffVar::DiffVarTableIterator::Next() {
 }
 
 DiffVar::DiffTableIteratorPtr DiffVar::DiffGetTableIterator() {
-    return std::make_shared<DiffVarTableIterator>(m_table.begin(), m_table.end());
+    return std::make_shared<DiffVarTableIterator>(m_vec.begin(), m_vec.end());
 }
 
 bool DiffVar::DiffEqual(DiffVarInterface *other) {
