@@ -134,7 +134,7 @@ local new_dst = lua_patch(src, diff, get_id)
 ```
 
 ### CPP使用
-参考[main.cpp](./test/main.cpp)中的示例使用，计算diff：
+参考[main.cpp](./test/main.cpp)中的示例，使用和算法与Lua版本一样。计算diff：
 ```cpp
 #include "diff_lua.h"
 
