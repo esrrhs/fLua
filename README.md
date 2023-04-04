@@ -147,6 +147,6 @@ auto diff = CalDiff(src, dst, get_id, new_func);
 ```
 输出结果diff与Lua一致，然后patch：
 ```cpp
-auto new_dst = Patch(src, diff, get_id, new_func);
+auto new_dst = PatchDiff(src, diff, get_id, new_func);
 ```
 最终new_dst与dst是相等的
