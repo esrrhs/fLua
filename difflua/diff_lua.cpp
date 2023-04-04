@@ -1,7 +1,7 @@
 #include <vector>
 #include "diff_lua.h"
 
-#define USE_DIFF_LOG
+//#define USE_DIFF_LOG
 
 #ifdef USE_DIFF_LOG
 #define LOG_ERROR(fmt, ...) do { \
@@ -113,7 +113,7 @@ DiffVarInterface *DiffVar::DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInte
         return this;
     }
 
-    if (v->GetDiffType() == DT_NIL) {
+    if (!v || v->GetDiffType() == DT_NIL) {
         auto it = m_table.find(k);
         if (it != m_table.end()) {
             for (auto it = m_vec.begin(); it != m_vec.end(); ++it) {
@@ -130,6 +130,12 @@ DiffVarInterface *DiffVar::DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInte
     auto it = m_table.find(k);
     if (it != m_table.end()) {
         it->second = v;
+        for (auto it = m_vec.begin(); it != m_vec.end(); ++it) {
+            if (it->first == k) {
+                it->second = v;
+                break;
+            }
+        }
     } else {
         m_table[k] = v;
         m_vec.push_back(std::make_pair(k, v));
@@ -213,6 +219,10 @@ bool DiffVar::DiffVarTableIterator::Next() {
 }
 
 DiffVar::DiffTableIteratorPtr DiffVar::DiffGetTableIterator() {
+    if (m_type != DT_TABLE) {
+        LOG_ERROR("type is not table");
+        return nullptr;
+    }
     return std::make_shared<DiffVarTableIterator>(m_vec.begin(), m_vec.end());
 }
 
@@ -361,6 +371,20 @@ ArrayToMap(DiffVarInterface *arr, DiffArrayElementGetIdFunc get_id_func, DiffVar
     return ret;
 }
 
+static DiffVarInterface *MapToArray(DiffVarInterface *map, DiffVarNewFunc new_func) {
+    auto ret = new_func()->DiffSetTable();
+
+    auto it = map->DiffGetTableIterator();
+    int i = 1;
+    while (it->Next()) {
+        auto v = it->Value();
+        ret->DiffSetTableKeyValue(new_func()->DiffSetInteger(i), v);
+        ++i;
+    }
+
+    return ret;
+}
+
 extern "C" DiffVarInterface *
 CalDiff(DiffVarInterface *src, DiffVarInterface *dst, DiffArrayElementGetIdFunc get_id_func, DiffVarNewFunc new_func) {
     LOG_DEBUG("start CalDiff src is %s", src->DiffDump().c_str());
@@ -422,4 +446,61 @@ CalDiff(DiffVarInterface *src, DiffVarInterface *dst, DiffArrayElementGetIdFunc 
     LOG_DEBUG("end CalDiff output is %s", diff->DiffDump().c_str());
 
     return diff;
+}
+
+extern "C" DiffVarInterface *
+PatchDiff(DiffVarInterface *src, DiffVarInterface *diff, DiffArrayElementGetIdFunc get_id_func,
+          DiffVarNewFunc new_func) {
+    LOG_DEBUG("start PatchDiff src is %s", src->DiffDump().c_str());
+    LOG_DEBUG("start PatchDiff input is %s", diff->DiffDump().c_str());
+
+    if (src->GetDiffType() != DT_TABLE || diff->GetDiffType() != DT_TABLE) {
+        LOG_DEBUG("dst is simple now %s", diff->DiffDump().c_str());
+        return diff;
+    }
+
+    auto __diff_lua_array_str = new_func()->DiffSetString("__diff_lua_array", strlen("__diff_lua_array"));
+    auto __diff_lua_array = diff->DiffGetTableValue(__diff_lua_array_str);
+    if (__diff_lua_array && __diff_lua_array->DiffGetBoolean()) {
+        src = ArrayToMap(src, get_id_func, new_func);
+    }
+
+    auto __diff_lua_del_str = new_func()->DiffSetString("__diff_lua_del", strlen("__diff_lua_del"));
+    auto __diff_lua_del = diff->DiffGetTableValue(__diff_lua_del_str);
+    if (__diff_lua_del) {
+        auto it = __diff_lua_del->DiffGetTableIterator();
+        while (it->Next()) {
+            auto k = it->Key();
+            auto v = it->Value();
+            src->DiffSetTableKeyValue(v, nullptr);
+        }
+    }
+
+    auto it = diff->DiffGetTableIterator();
+    while (it->Next()) {
+        auto k = it->Key();
+        auto v = it->Value();
+
+        if (k->DiffEqual(__diff_lua_array_str) || k->DiffEqual(__diff_lua_del_str)) {
+            continue;
+        }
+
+        if (v->GetDiffType() == DT_TABLE) {
+            auto src_v = src->DiffGetTableValue(k);
+            if (!src_v) {
+                src->DiffSetTableKeyValue(k, v);
+            } else {
+                auto sub = PatchDiff(src_v, v, get_id_func, new_func);
+                src->DiffSetTableKeyValue(k, sub);
+            }
+        } else {
+            src->DiffSetTableKeyValue(k, v);
+        }
+    }
+
+    if (__diff_lua_array && __diff_lua_array->DiffGetBoolean()) {
+        src = MapToArray(src, new_func);
+    }
+
+    return src;
 }

@@ -88,7 +88,7 @@ public:
     virtual size_t DiffHash() = 0;
 };
 
-// 通用的DiffVar实现，也可以自己实现一种结构来对接
+// 通用的DiffVar实现，并不高效，可以自己实现一种结构来对接DiffVarInterface
 class DiffVar : public DiffVarInterface {
 public:
     struct DiffVarInterfacePtrHash {
@@ -184,7 +184,11 @@ typedef std::function<DiffVarInterface *()> DiffVarNewFunc;
 
 typedef std::function<DiffVarInterface *(DiffVarInterface *element)> DiffArrayElementGetIdFunc;
 
-// 计算差分，确保env同时只被一个线程使用
-// 返回src->dst的diff
+// 计算差分，返回src->dst的diff
 extern "C" DiffVarInterface *
 CalDiff(DiffVarInterface *src, DiffVarInterface *dst, DiffArrayElementGetIdFunc get_id_func, DiffVarNewFunc new_func);
+
+// 合并差分，返回src+diff的dst
+extern "C" DiffVarInterface *
+PatchDiff(DiffVarInterface *src, DiffVarInterface *diff, DiffArrayElementGetIdFunc get_id_func,
+          DiffVarNewFunc new_func);

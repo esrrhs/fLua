@@ -193,5 +193,14 @@ int main(int argc, char *argv[]) {
     auto diff_str = diff->DiffDump(0);
     printf("diff is %s", diff_str.c_str());
 
+    auto patch = PatchDiff(src, diff, get_id, new_func);
+    if (!patch) {
+        printf("patch_env_diff failed\n");
+        return -1;
+    }
+
+    auto patch_str = patch->DiffDump(0);
+    printf("patch is %s", patch_str.c_str());
+
     return 0;
 }

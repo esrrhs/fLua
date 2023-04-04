@@ -134,10 +134,14 @@ local new_dst = lua_patch(src, diff, get_id)
 ```
 
 ### CPP使用
-参考[main.cpp](./test/main.cpp)中的示例，使用方式：
+参考[main.cpp](./test/main.cpp)中的示例使用，计算diff：
 ```cpp
 #include "diff_lua.h"
 
 auto diff = CalDiff(src, dst, get_id, new_func);
 ```
-输出结果与Lua一致
+输出结果diff与Lua一致，然后patch：
+```cpp
+auto new_dst = Patch(src, diff, get_id, new_func);
+```
+最终new_dst与dst是相等的
