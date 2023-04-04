@@ -4,11 +4,13 @@
 int main(int argc, char *argv[]) {
 
     auto get_id = [](DiffVarInterface *v) {
-        return v->DiffGetTableValue(DiffVarPoolAlloc()->DiffSetString("id", 2));
+        return v->DiffGetTableValue(DiffPool<DiffVar>::Instance().Alloc()->DiffSetString("id", 2));
     };
 
     auto new_func = []() {
-        return DiffVarPoolAlloc();
+        auto ret = DiffPool<DiffVar>::Instance().Alloc();
+        ret->DiffSetNil();
+        return ret;
     };
 
     auto src = new_func()->DiffSetTable();
@@ -135,19 +137,21 @@ int main(int argc, char *argv[]) {
 
     dst->DiffSetTableKeyValue(new_func()->DiffSetString("sub", 3), new_func()->DiffSetTable());
     dst->DiffGetTableValue(new_func()->DiffSetString("sub", 3))->DiffSetTableKeyValue(new_func()->DiffSetString("a", 1),
-                                                                                     new_func()->DiffSetInteger(12));
+                                                                                      new_func()->DiffSetInteger(12));
     dst->DiffGetTableValue(new_func()->DiffSetString("sub", 3))->DiffSetTableKeyValue(new_func()->DiffSetString("b", 1),
-                                                                                        new_func()->DiffSetString("11", 2));
+                                                                                      new_func()->DiffSetString("11",
+                                                                                                                2));
 
     dst->DiffSetTableKeyValue(new_func()->DiffSetString("array", 5), new_func()->DiffSetTable());
     dst->DiffGetTableValue(new_func()->DiffSetString("array", 5))->DiffSetTableKeyValue(new_func()->DiffSetInteger(1),
-                                                                                      new_func()->DiffSetInteger(2));
+                                                                                        new_func()->DiffSetInteger(2));
     dst->DiffGetTableValue(new_func()->DiffSetString("array", 5))->DiffSetTableKeyValue(new_func()->DiffSetInteger(2),
                                                                                         new_func()->DiffSetInteger(3));
 
     dst->DiffSetTableKeyValue(new_func()->DiffSetString("obj_array", 9), new_func()->DiffSetTable());
-    dst->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffSetTableKeyValue(new_func()->DiffSetInteger(1),
-                                                                                          new_func()->DiffSetTable());
+    dst->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffSetTableKeyValue(
+            new_func()->DiffSetInteger(1),
+            new_func()->DiffSetTable());
     dst->DiffGetTableValue(new_func()->DiffSetString("obj_array", 9))->DiffGetTableValue(
             new_func()->DiffSetInteger(1))->DiffSetTableKeyValue(new_func()->DiffSetString("id", 2),
                                                                  new_func()->DiffSetInteger(2));
@@ -201,6 +205,8 @@ int main(int argc, char *argv[]) {
 
     auto patch_str = patch->DiffDump(0);
     printf("patch is %s", patch_str.c_str());
+
+    DiffPool<DiffVar>::Instance().Reset();
 
     return 0;
 }

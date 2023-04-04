@@ -88,7 +88,7 @@ public:
     virtual size_t DiffHash() = 0;
 };
 
-// 通用的DiffVar实现，并不高效，可以自己实现一种结构来对接DiffVarInterface
+// 测试用的DiffVar实现，并不高效，可以自己实现一种结构来对接DiffVarInterface
 class DiffVar : public DiffVarInterface {
 public:
     struct DiffVarInterfacePtrHash {
@@ -174,11 +174,126 @@ private:
     std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>> m_vec;
 };
 
-// 从池子中分配一个DiffVar
-extern "C" DiffVar *DiffVarPoolAlloc();
+template<typename T>
+class DiffPool {
+public:
+    DiffPool() {
+    }
 
-// 释放池子中所有DiffVar
-extern "C" void DiffVarPoolReset(DiffVar *var);
+    ~DiffPool() {
+        for (auto it: m_free) {
+            delete it;
+        }
+        for (auto it: m_used) {
+            delete it;
+        }
+    }
+
+    static DiffPool &Instance() {
+        static DiffPool<T> pool;
+        return pool;
+    }
+
+    T *Alloc() {
+        if (m_free.empty()) {
+            auto ret = new T();
+            m_used.push_back(ret);
+            return ret;
+        }
+        auto ret = m_free.back();
+        m_free.pop_back();
+        m_used.push_back(ret);
+        return ret;
+    }
+
+    void Reset() {
+        for (auto it: m_used) {
+            m_free.push_back(it);
+        }
+        m_used.clear();
+    }
+
+private:
+    std::vector<T *> m_free;
+    std::vector<T *> m_used;
+};
+
+// 针对Lua的DiffVar实现，可以直接对接Lua的数据结构
+class DiffLuaVar : public DiffVarInterface {
+public:
+    DiffLuaVar();
+
+    virtual ~DiffLuaVar();
+
+    virtual DiffType GetDiffType() override;
+
+    virtual std::string DiffDump(int tab = 0) override;
+
+    virtual DiffVarInterface *DiffSetNil() override;
+
+    virtual DiffVarInterface *DiffSetTable() override;
+
+    virtual DiffVarInterface *DiffSetString(const char *s, size_t len) override;
+
+    virtual DiffVarInterface *DiffSetInteger(int64_t i) override;
+
+    virtual DiffVarInterface *DiffSetNumber(double n) override;
+
+    virtual DiffVarInterface *DiffSetBoolean(bool b) override;
+
+    virtual DiffVarInterface *DiffSetTableKeyValue(DiffVarInterface *k, DiffVarInterface *v) override;
+
+    virtual const char *DiffGetString(size_t &len) override;
+
+    virtual int64_t DiffGetInteger() override;
+
+    virtual double DiffGetNumber() override;
+
+    virtual bool DiffGetBoolean() override;
+
+    virtual DiffVarInterface *DiffGetTableValue(DiffVarInterface *k) override;
+
+    virtual size_t DiffGetTableSize() override;
+
+    class DiffLuaVarTableIterator : public DiffTableIterator {
+    public:
+        DiffLuaVarTableIterator(
+                std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator it,
+                std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator end);
+
+        virtual DiffVarInterface *Key() override;
+
+        virtual DiffVarInterface *Value() override;
+
+        virtual bool Next() override;
+
+    private:
+        friend class DiffVar;
+
+        std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator m_it;
+        std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>>::iterator m_end;
+        DiffVarInterface *m_key = nullptr;
+        DiffVarInterface *m_value = nullptr;
+    };
+
+    virtual DiffTableIteratorPtr DiffGetTableIterator() override;
+
+    virtual bool DiffEqual(DiffVarInterface *other) override;
+
+    virtual size_t DiffHash() override;
+
+private:
+    DiffType m_type = DT_NIL;
+    const char *m_string;
+    size_t m_string_len;
+    int64_t m_integer = 0;
+    double m_number = 0;
+    bool m_boolean = false;
+    std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>> m_vec;
+};
+//
+//// 把lua中的数据转成DiffVarInterface
+//extern "C" DiffVarInterface *LuaToDiffVarInterface(lua_State *L, int index);
 
 typedef std::function<DiffVarInterface *()> DiffVarNewFunc;
 
