@@ -1,4 +1,9 @@
 # fLua
+
+[<img src="https://img.shields.io/github/license/esrrhs/fLua">](https://github.com/esrrhs/fLua)
+[<img src="https://img.shields.io/github/languages/top/esrrhs/fLua">](https://github.com/esrrhs/fLua)
+[<img src="https://img.shields.io/github/actions/workflow/status/esrrhs/fLua/cmake.yml?branch=master">](https://github.com/esrrhs/fLua/actions)
+
 Lua的增量修改和合并库，同时支持纯Lua和CPP
 
 # 使用
