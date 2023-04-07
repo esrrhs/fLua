@@ -291,9 +291,6 @@ private:
     bool m_boolean = false;
     std::vector<std::pair<DiffVarInterface *, DiffVarInterface *>> m_vec;
 };
-//
-//// 把lua中的数据转成DiffVarInterface
-//extern "C" DiffVarInterface *LuaToDiffVarInterface(lua_State *L, int index);
 
 typedef std::function<DiffVarInterface *()> DiffVarNewFunc;
 

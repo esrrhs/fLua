@@ -22,6 +22,7 @@
 #else
 #define LOG_ERROR(fmt, ...)
 #define LOG_DEBUG(fmt, ...)
+
 #endif
 
 DiffVar::DiffVar() {
@@ -702,39 +703,157 @@ size_t DiffLuaVar::DiffHash() {
             return 0;
     }
 }
-//
-//extern "C" DiffVarInterface *LuaToDiffVarInterface(lua_State *L, int index) {
-//    switch (lua_type(L, index)) {
-//        case LUA_TNIL:
-//            return new DiffLuaVar(DT_NIL);
-//        case LUA_TSTRING: {
-//            size_t len = 0;
-//            auto str = lua_tolstring(L, index, &len);
-//            return new DiffLuaVar(str, len);
-//        }
-//        case LUA_TNUMBER: {
-//            auto n = lua_tonumber(L, index);
-//            if (n == (int64_t) n) {
-//                return new DiffLuaVar((int64_t) n);
-//            } else {
-//                return new DiffLuaVar(n);
-//            }
-//        }
-//        case LUA_TBOOLEAN:
-//            return new DiffLuaVar(lua_toboolean(L, index));
-//        case LUA_TTABLE: {
-//            auto var = new DiffLuaVar(DT_TABLE);
-//            lua_pushnil(L);
-//            while (lua_next(L, index) != 0) {
-//                auto k = LuaToDiffVarInterface(L, -2);
-//                auto v = LuaToDiffVarInterface(L, -1);
-//                var->DiffSetTableKeyValue(k, v);
-//                lua_pop(L, 1);
-//            }
-//            return var;
-//        }
-//        default:
-//            LOG_ERROR("unknown type %d", lua_type(L, index));
-//            return nullptr;
-//    }
-//}
+
+extern "C" DiffVarInterface *LuaToDiffVarInterface(lua_State *L, int index, DiffVarNewFunc new_func) {
+    switch (lua_type(L, index)) {
+        case LUA_TNIL:
+            return new_func();
+        case LUA_TSTRING: {
+            size_t len = 0;
+            auto str = lua_tolstring(L, index, &len);
+            return new_func()->DiffSetString(str, len);
+        }
+        case LUA_TNUMBER: {
+            auto num = lua_tonumber(L, index);
+            if (num == (int64_t) num) {
+                return new_func()->DiffSetInteger((int64_t) num);
+            } else {
+                return new_func()->DiffSetNumber(num);
+            }
+        }
+        case LUA_TBOOLEAN: {
+            return new_func()->DiffSetBoolean(lua_toboolean(L, index));
+        }
+        case LUA_TTABLE: {
+            int top = lua_gettop(L);
+
+            if (index < 0 && -index <= top) {
+                index = top + index + 1;
+            }
+
+            if (!lua_checkstack(L, 1)) {
+                LOG_ERROR("lua stack overflow");
+                return nullptr;
+            }
+
+            auto ret = new_func()->DiffSetTable();
+            lua_pushnil(L);
+            while (lua_next(L, index) != 0) {
+                auto key = LuaToDiffVarInterface(L, -2, new_func);
+                auto value = LuaToDiffVarInterface(L, -1, new_func);
+                ret->DiffSetTableKeyValue(key, value);
+                lua_pop(L, 1);
+            }
+            return ret;
+        }
+        default:
+            LOG_ERROR("unknown type %d", lua_type(L, index));
+            return nullptr;
+    }
+}
+
+static int DiffVarInterfaceToLua(lua_State *L, DiffVarInterface *src) {
+    if (!lua_checkstack(L, 1)) {
+        LOG_ERROR("lua stack overflow");
+        return -1;
+    }
+
+    switch (src->GetDiffType()) {
+        case DT_NIL:
+            lua_pushnil(L);
+            return 0;
+        case DT_STRING: {
+            size_t size = 0;
+            auto str = src->DiffGetString(size);
+            lua_pushlstring(L, str, size);
+            return 0;
+        }
+        case DT_INTEGER:
+            lua_pushinteger(L, src->DiffGetInteger());
+            return 0;
+        case DT_NUMBER:
+            lua_pushnumber(L, src->DiffGetNumber());
+            return 0;
+        case DT_BOOLEAN:
+            lua_pushboolean(L, src->DiffGetBoolean());
+            return 0;
+        case DT_TABLE: {
+            int top = lua_gettop(L);
+            lua_createtable(L, 16, 16);
+            auto it = src->DiffGetTableIterator();
+            while (it->Next()) {
+                if (DiffVarInterfaceToLua(L, it->Key()) != 0) {
+                    lua_settop(L, top);
+                    return -1;
+                }
+                if (DiffVarInterfaceToLua(L, it->Value()) != 0) {
+                    lua_settop(L, top);
+                    return -1;
+                }
+                lua_settable(L, -3);
+            }
+            return 0;
+        }
+        default:
+            LOG_ERROR("unknown type %d", src->GetDiffType());
+            return -1;
+    }
+}
+
+// 计算差分，针对Lua的接口
+static int LuaCalDiff(lua_State *L) {
+    int top = lua_gettop(L);
+
+    auto new_func = []() {
+        auto ret = DiffPool<DiffLuaVar>::Instance().Alloc();
+        ret->DiffSetNil();
+        return ret;
+    };
+
+    auto src = LuaToDiffVarInterface(L, 1, new_func);
+    if (src == nullptr) {
+        LOG_ERROR("src is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+    auto dst = LuaToDiffVarInterface(L, 2, new_func);
+    if (dst == nullptr) {
+        LOG_ERROR("dst is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+    lua_CFunction get_id_lua_cfunc = lua_tocfunction(L, 3);
+    if (get_id_lua_cfunc == nullptr) {
+        LOG_ERROR("get_id_lua_cfunc is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    auto get_id = [=](DiffVarInterface *v) {
+        auto top = lua_gettop(L);
+        lua_pushlightuserdata(L, v);
+        get_id_lua_cfunc(L);
+        auto id = (DiffVarInterface *) lua_touserdata(L, -1);
+        lua_settop(L, top);
+        return id;
+    };
+
+    auto diff = CalDiff(src, dst, get_id, new_func);
+
+    if (DiffVarInterfaceToLua(L, diff) != 0) {
+        LOG_ERROR("DiffVarInterfaceToLua failed");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    return 1;
+}
+
+extern "C" int luaopen_libdifflua(lua_State *L) {
+    luaL_Reg l[] = {
+            {"cal_diff", LuaCalDiff},
+            {nullptr,    nullptr}
+    };
+    luaL_newlib(L, l);
+    return 1;
+}

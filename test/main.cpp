@@ -1,8 +1,39 @@
 #include "diff_lua.h"
 #include "stdio.h"
 
-int main(int argc, char *argv[]) {
+bool check_table_same(DiffVarInterface *left, DiffVarInterface *right) {
+    if (left->DiffGetTableSize() != right->DiffGetTableSize()) {
+        return false;
+    }
+    auto left_iter = left->DiffGetTableIterator();
+    auto right_iter = right->DiffGetTableIterator();
+    while (left_iter->Next() && right_iter->Next()) {
+        if (left_iter->Key()->GetDiffType() == DiffType::DT_TABLE &&
+            right_iter->Key()->GetDiffType() == DiffType::DT_TABLE) {
+            if (!check_table_same(left_iter->Key(), right_iter->Key())) {
+                return false;
+            }
+        } else {
+            if (!left_iter->Key()->DiffEqual(right_iter->Key())) {
+                return false;
+            }
+        }
 
+        if (left_iter->Value()->GetDiffType() == DiffType::DT_TABLE &&
+            right_iter->Value()->GetDiffType() == DiffType::DT_TABLE) {
+            if (!check_table_same(left_iter->Value(), right_iter->Value())) {
+                return false;
+            }
+        } else {
+            if (!left_iter->Value()->DiffEqual(right_iter->Value())) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+int pure_cpp_test() {
     auto get_id = [](DiffVarInterface *v) {
         return v->DiffGetTableValue(DiffPool<DiffVar>::Instance().Alloc()->DiffSetString("id", 2));
     };
@@ -206,7 +237,45 @@ int main(int argc, char *argv[]) {
     auto patch_str = patch->DiffDump(0);
     printf("patch is %s", patch_str.c_str());
 
+    if (check_table_same(dst, patch)) {
+        printf("pure_cpp_test patch success\n");
+    } else {
+        printf("pure_cpp_test patch failed\n");
+        return -1;
+    }
+
     DiffPool<DiffVar>::Instance().Reset();
 
+    return 0;
+}
+
+int lua_get_id(lua_State *L) {
+    auto id = lua_tointeger(L, 1);
+    lua_pushinteger(L, id);
+    return 1;
+}
+
+int mix_cpp_test() {
+    auto L = luaL_newstate();
+    luaL_openlibs(L);
+
+    lua_pushcfunction(L, lua_get_id);
+    lua_setglobal(L, "lua_get_id");
+
+    if (luaL_dofile(L, "mix_cpp_test.lua") != 0) {
+        printf("mix_cpp_test luaL_dofile failed %s\n", lua_tostring(L, -1));
+        return -1;
+    }
+
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    if (pure_cpp_test() != 0) {
+        return -1;
+    }
+    if (mix_cpp_test() != 0) {
+        return -1;
+    }
     return 0;
 }

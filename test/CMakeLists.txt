@@ -12,3 +12,9 @@ IF (WIN32)
 ELSE ()
     target_link_libraries(test lua difflua dl)
 ENDIF ()
+
+add_custom_command(
+        TARGET test
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../mix_cpp_test.lua ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}/
+)
