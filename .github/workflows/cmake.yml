@@ -25,6 +25,7 @@ jobs:
         
     - name: build
       run: |
+        lua pure_lua_test.lua
         mkdir build
         cd build
         cmake ..
