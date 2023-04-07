@@ -164,3 +164,6 @@ Lua调用CPP进行patch：
 lualocal new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
 ```
 最终new_dst与dst是相等的
+
+## 其他
+[lua全家桶](https://github.com/esrrhs/lua-family-bucket)
