@@ -250,8 +250,15 @@ int pure_cpp_test() {
 }
 
 int lua_get_id(lua_State *L) {
-    auto id = lua_tointeger(L, 1);
-    lua_pushinteger(L, id);
+    auto v = (DiffVarInterface *) lua_touserdata(L, -1);
+    auto id = v->DiffGetTableValue(DiffPool<DiffLuaVar>::Instance().Alloc()->DiffSetString("id", 2));
+    lua_pushlightuserdata(L, id);
+    return 1;
+}
+
+int lua_new_func(lua_State *L) {
+    auto v = DiffPool<DiffLuaVar>::Instance().Alloc();
+    lua_pushlightuserdata(L, v);
     return 1;
 }
 
@@ -262,10 +269,16 @@ int mix_cpp_test() {
     lua_pushcfunction(L, lua_get_id);
     lua_setglobal(L, "lua_get_id");
 
+    lua_pushcfunction(L, lua_new_func);
+    lua_setglobal(L, "lua_new_func");
+
     if (luaL_dofile(L, "mix_cpp_test.lua") != 0) {
         printf("mix_cpp_test luaL_dofile failed %s\n", lua_tostring(L, -1));
         return -1;
     }
+
+    printf("mix_cpp_test success\n");
+    lua_close(L);
 
     return 0;
 }

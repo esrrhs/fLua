@@ -1,3 +1,5 @@
+package.cpath = "../lib64/?.so;../lib/?.so;" .. package.cpath
+
 local libdifflua = require("libdifflua")
 
 local src = {
@@ -120,8 +122,8 @@ local function print_table(node)
     print(output_str)
 end
 
-local diff = libdifflua.cal_diff(src, dst, _G.lua_get_id)
+local diff = libdifflua.cal_diff(src, dst, _G.lua_get_id, _G.lua_new_func)
 print_table(diff)
---
---local new_dst = lua_patch(src, diff, get_id)
---print_table(new_dst)
+
+local new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
+print_table(new_dst)

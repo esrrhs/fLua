@@ -304,3 +304,9 @@ CalDiff(DiffVarInterface *src, DiffVarInterface *dst, DiffArrayElementGetIdFunc 
 extern "C" DiffVarInterface *
 PatchDiff(DiffVarInterface *src, DiffVarInterface *diff, DiffArrayElementGetIdFunc get_id_func,
           DiffVarNewFunc new_func);
+
+// 计算差分，针对Lua的接口，参数与CalDiff一致
+extern "C" int LuaCalDiff(lua_State *L);
+
+// 合并差分，针对Lua的接口，参数与PatchDiff一致
+extern "C" int LuaPatchDiff(lua_State *L);

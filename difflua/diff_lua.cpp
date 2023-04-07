@@ -800,28 +800,9 @@ static int DiffVarInterfaceToLua(lua_State *L, DiffVarInterface *src) {
     }
 }
 
-// 计算差分，针对Lua的接口
-static int LuaCalDiff(lua_State *L) {
+extern "C" int LuaCalDiff(lua_State *L) {
     int top = lua_gettop(L);
 
-    auto new_func = []() {
-        auto ret = DiffPool<DiffLuaVar>::Instance().Alloc();
-        ret->DiffSetNil();
-        return ret;
-    };
-
-    auto src = LuaToDiffVarInterface(L, 1, new_func);
-    if (src == nullptr) {
-        LOG_ERROR("src is nil");
-        lua_settop(L, top);
-        return 0;
-    }
-    auto dst = LuaToDiffVarInterface(L, 2, new_func);
-    if (dst == nullptr) {
-        LOG_ERROR("dst is nil");
-        lua_settop(L, top);
-        return 0;
-    }
     lua_CFunction get_id_lua_cfunc = lua_tocfunction(L, 3);
     if (get_id_lua_cfunc == nullptr) {
         LOG_ERROR("get_id_lua_cfunc is nil");
@@ -838,6 +819,35 @@ static int LuaCalDiff(lua_State *L) {
         return id;
     };
 
+    lua_CFunction new_func_cfunc = lua_tocfunction(L, 4);
+    if (new_func_cfunc == nullptr) {
+        LOG_ERROR("new_func_cfunc is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    auto new_func = [=]() {
+        auto top = lua_gettop(L);
+        new_func_cfunc(L);
+        auto ret = (DiffVarInterface *) lua_touserdata(L, -1);
+        lua_settop(L, top);
+        return ret;
+    };
+
+    auto src = LuaToDiffVarInterface(L, 1, new_func);
+    if (src == nullptr) {
+        LOG_ERROR("src is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    auto dst = LuaToDiffVarInterface(L, 2, new_func);
+    if (dst == nullptr) {
+        LOG_ERROR("dst is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
     auto diff = CalDiff(src, dst, get_id, new_func);
 
     if (DiffVarInterfaceToLua(L, diff) != 0) {
@@ -849,10 +859,70 @@ static int LuaCalDiff(lua_State *L) {
     return 1;
 }
 
+extern "C" int LuaPatchDiff(lua_State *L) {
+    int top = lua_gettop(L);
+
+    lua_CFunction get_id_lua_cfunc = lua_tocfunction(L, 3);
+    if (get_id_lua_cfunc == nullptr) {
+        LOG_ERROR("get_id_lua_cfunc is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    auto get_id = [=](DiffVarInterface *v) {
+        auto top = lua_gettop(L);
+        lua_pushlightuserdata(L, v);
+        get_id_lua_cfunc(L);
+        auto id = (DiffVarInterface *) lua_touserdata(L, -1);
+        lua_settop(L, top);
+        return id;
+    };
+
+    lua_CFunction new_func_cfunc = lua_tocfunction(L, 4);
+    if (new_func_cfunc == nullptr) {
+        LOG_ERROR("new_func_cfunc is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    auto new_func = [=]() {
+        auto top = lua_gettop(L);
+        new_func_cfunc(L);
+        auto ret = (DiffVarInterface *) lua_touserdata(L, -1);
+        lua_settop(L, top);
+        return ret;
+    };
+
+    auto src = LuaToDiffVarInterface(L, 1, new_func);
+    if (src == nullptr) {
+        LOG_ERROR("src is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    auto diff = LuaToDiffVarInterface(L, 2, new_func);
+    if (diff == nullptr) {
+        LOG_ERROR("diff is nil");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    auto dst = PatchDiff(src, diff, get_id, new_func);
+
+    if (DiffVarInterfaceToLua(L, dst) != 0) {
+        LOG_ERROR("DiffVarInterfaceToLua failed");
+        lua_settop(L, top);
+        return 0;
+    }
+
+    return 1;
+}
+
 extern "C" int luaopen_libdifflua(lua_State *L) {
     luaL_Reg l[] = {
-            {"cal_diff", LuaCalDiff},
-            {nullptr,    nullptr}
+            {"cal_diff",   LuaCalDiff},
+            {"patch_diff", LuaPatchDiff},
+            {nullptr,      nullptr}
     };
     luaL_newlib(L, l);
     return 1;

@@ -20,7 +20,7 @@ jobs:
         sudo wget https://www.lua.org/ftp/lua-5.3.4.tar.gz
         sudo tar -xf lua-5.3.4.tar.gz
         cd lua-5.3.4
-        sudo make linux
+        sudo MYCFLAGS=-fPIC make linux
         sudo make install
         
     - name: build
