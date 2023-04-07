@@ -138,8 +138,8 @@ local new_dst = lua_patch(src, diff, get_id)
 }
 ```
 
-### CPP使用
-参考[main.cpp](./test/main.cpp)中的示例，使用和算法与Lua版本一样。计算diff：
+### 纯CPP使用
+参考[main.cpp](./test/main.cpp)中的pure_cpp_test函数，使用和算法与Lua版本一样。计算diff：
 ```cpp
 #include "diff_lua.h"
 
@@ -148,5 +148,19 @@ auto diff = CalDiff(src, dst, get_id, new_func);
 输出结果diff与Lua一致，然后patch：
 ```cpp
 auto new_dst = PatchDiff(src, diff, get_id, new_func);
+```
+最终new_dst与dst是相等的
+
+### CPP+Lua混合使用
+参考[main.cpp](./test/main.cpp)中的mix_cpp_test函数和[mix_cpp_test.lua](./mix_cpp_test.lua)，在Lua中调用CPP计算diff：
+```lua
+local libdifflua = require("libdifflua")
+local diff = libdifflua.cal_diff(src, dst, _G.lua_get_id, _G.lua_new_func)
+```
+CPP会把Lua table转成内置数据结构，计算diff，然后再转回Lua Table。
+
+Lua调用CPP进行patch：
+```lua
+lualocal new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
 ```
 最终new_dst与dst是相等的
