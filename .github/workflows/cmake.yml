@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: prepare-lua
+    - name: prepare
       run: |
         sudo apt-get install libreadline-dev -y
         sudo wget https://www.lua.org/ftp/lua-5.3.4.tar.gz
