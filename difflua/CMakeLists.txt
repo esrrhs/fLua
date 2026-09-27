@@ -1,14 +1,32 @@
-cmake_minimum_required(VERSION 2.8)
-project(difflua)
+add_library(difflua SHARED
+    diff_lua.cpp
+)
 
-include_directories(.)
+target_include_directories(difflua
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${LUA_INCLUDE_DIR}
+)
 
-aux_source_directory(./ DIFFLUA_SRC_LIST)
+set_target_properties(difflua PROPERTIES
+    OUTPUT_NAME "difflua"
+    PREFIX "lib"
+    POSITION_INDEPENDENT_CODE ON
+)
 
-add_library(difflua SHARED ${DIFFLUA_SRC_LIST})
-IF (WIN32)
-    target_link_libraries(difflua lua)
-ELSE ()
-    target_link_libraries(difflua lua dl)
-ENDIF ()
+# Lua C modules leave Lua symbols unresolved on UNIX; they are provided by the
+# host interpreter (or by the embedding executable linked with --export-dynamic).
+if(WIN32)
+    target_link_libraries(difflua
+        PUBLIC
+            ${LUA_LIBRARIES}
+    )
+elseif(APPLE)
+    target_link_options(difflua PRIVATE -undefined dynamic_lookup)
+endif()
 
+target_compile_options(difflua
+    PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/W4>
+        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra>
+)

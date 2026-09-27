@@ -2,33 +2,26 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    
-    - name: prepare
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
       run: |
-        sudo apt-get install libreadline-dev -y
-        sudo wget https://www.lua.org/ftp/lua-5.3.4.tar.gz
-        sudo tar -xf lua-5.3.4.tar.gz
-        cd lua-5.3.4
-        sudo make linux MYCFLAGS=-fPIC
-        sudo make install
-        
-    - name: build
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential lua5.3 liblua5.3-dev
+        sudo update-alternatives --install /usr/bin/lua lua /usr/bin/lua5.3 100 || true
+        lua -v || lua5.3 -v
+
+    - name: Build and test
       run: |
-        lua pure_lua_test.lua
-        mkdir build
-        cd build
-        cmake ..
-        make
-        cd bin
-        ./test
+        chmod +x ./build.sh
+        ./build.sh

@@ -283,7 +283,7 @@ int mix_cpp_test() {
     return 0;
 }
 
-int main(int argc, char *argv[]) {
+int main(int, char *[]) {
     if (pure_cpp_test() != 0) {
         return -1;
     }

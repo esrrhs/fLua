@@ -1,4 +1,5 @@
-package.cpath = "../lib64/?.so;../lib/?.so;" .. package.cpath
+-- Prefer the locally built shared library next to the test binary
+package.cpath = "./?.so;./?.dylib;./?.dll;" .. package.cpath
 
 local libdifflua = require("libdifflua")
 

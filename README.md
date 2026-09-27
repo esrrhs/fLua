@@ -4,15 +4,51 @@
 [<img src="https://img.shields.io/github/languages/top/esrrhs/fLua">](https://github.com/esrrhs/fLua)
 [<img src="https://img.shields.io/github/actions/workflow/status/esrrhs/fLua/cmake.yml?branch=master">](https://github.com/esrrhs/fLua/actions)
 
-Lua的增量修改和合并库，同时支持纯Lua和CPP
+> **A diff and patch library for Lua tables, with pure Lua and C++ implementations.**
 
-# 使用
-### 纯Lua使用
-参考[pure_lua_test.lua](pure_lua_test.lua)中的示例，运行方式：
-```shell
+[English](README.md) | [Chinese](README_CN.md)
+
+---
+
+## Overview
+**fLua** (`f` stands for fix / diff) computes incremental differences between two Lua table values and applies those differences back as patches. It ships both a pure Lua implementation and a C++ library that can be used standalone or bridged into Lua.
+
+## Features
+* **Pure Lua API**: Drop in `pure_lua_diff.lua` and call `lua_diff` / `lua_patch` with no native dependencies.
+* **Native C++ API**: Use `CalDiff` / `PatchDiff` directly from C++ with the same algorithm semantics.
+* **Lua ↔ C++ Bridge**: Load `libdifflua.so` from Lua to run the C++ implementation on Lua tables.
+* **Object Array Awareness**: Optional `get_id` callback reduces diffs for large object arrays by matching elements on a stable identity.
+* **Deletion Tracking**: Removed keys are recorded under `__diff_lua_del` so patches can fully restore the destination shape.
+
+## Prerequisites
+* **Lua**: 5.3+ (interpreter for pure Lua usage; development headers/libraries for the C++ build)
+* **Compiler & Build Tools**: CMake (>= 3.12), C++11 compiler (GCC / Clang / MSVC)
+* **Platform**: Linux, macOS, or Windows
+
+## Build
+Run the build script:
+```bash
+./build.sh
+```
+Or use modern CMake commands:
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
+Artifacts are written to `build/bin/`:
+* `libdifflua.so` — shared library / Lua module
+* `flua_test` — C++ unit tests
+
+## Usage
+
+### 1. Pure Lua
+See [`pure_lua_test.lua`](pure_lua_test.lua):
+```bash
 lua pure_lua_test.lua
 ```
-原始table为：
+
+Source table:
 ```lua
 local src = {
     a = 1,
@@ -34,7 +70,8 @@ local src = {
     }
 }
 ```
-新的table为：
+
+Destination table:
 ```lua
 local dst = {
     b = "2",
@@ -52,19 +89,19 @@ local dst = {
     }
 }
 ```
-计算diff：
-```lua
-local diff = lua_diff(src, dst, get_id)
-```
-注意：这里的get_id，是用来针对obj_array中的每个元素，获取其唯一标识的函数。目的是为了尽量减少大Obj数组的diff差异。这里的示例中，我们假设obj_array中的每个元素都有一个id字段，用来唯一标识该元素，所以get_id函数就是：
+
+Compute the diff:
 ```lua
 local get_id = function(v)
     return v.id
 end
-```
-当然，如果obj_array中的元素没有id字段，那么get_id函数就可以返回nil，这样就会对obj_array进行全量diff，这样的话，diff结果就会比较大。
 
-最终的diff结果为：
+local diff = lua_diff(src, dst, get_id)
+```
+
+`get_id` returns a stable identity for each element in object arrays (here, the `id` field). Returning `nil` falls back to a full-array diff, which may produce a larger result.
+
+Example diff:
 ```lua
 {
     ['d'] = false,
@@ -100,70 +137,41 @@ end
     }
 }
 ```
-然后可以将diff应用到原始table上，得到新的table：
+
+Apply the patch:
 ```lua
 local new_dst = lua_patch(src, diff, get_id)
 ```
-最终新的table与dst是相等的，注意这里obj_array里的元素顺序不一定是完全一致的
-```lua
-{
-	['b'] = '2',
-	['d'] = false,
-	['c'] = 3.4,
-	['obj_array'] = {
-		[1] = {
-			['b'] = 4,
-			['a'] = 3,
-			['id'] = 2
-		},
-		[2] = {
-			['b'] = 6,
-			['a'] = 5,
-			['id'] = 3
-		},
-		[3] = {
-			['b'] = 80,
-			['a'] = 70,
-			['id'] = 4
-		}
-	},
-	['array'] = {
-		[1] = 2,
-		[2] = 3
-	},
-	['sub'] = {
-		['b'] = '11',
-		['a'] = 12
-	}
-}
-```
+`new_dst` equals `dst` in content. Object-array element order is not guaranteed to be identical.
 
-### 纯CPP使用
-参考[main.cpp](./test/main.cpp)中的pure_cpp_test函数，使用和算法与Lua版本一样。计算diff：
+### 2. Pure C++
+See `pure_cpp_test` in [`test/main.cpp`](./test/main.cpp). The algorithm matches the Lua version:
 ```cpp
 #include "diff_lua.h"
 
 auto diff = CalDiff(src, dst, get_id, new_func);
-```
-输出结果diff与Lua一致，然后patch：
-```cpp
 auto new_dst = PatchDiff(src, diff, get_id, new_func);
 ```
-最终new_dst与dst是相等的
 
-### CPP+Lua混合使用
-参考[main.cpp](./test/main.cpp)中的mix_cpp_test函数和[mix_cpp_test.lua](./mix_cpp_test.lua)，在Lua中调用CPP计算diff：
+### 3. Mixed C++ + Lua
+See `mix_cpp_test` in [`test/main.cpp`](./test/main.cpp) and [`mix_cpp_test.lua`](./mix_cpp_test.lua).
+
+Compute a diff from Lua through the C++ library:
 ```lua
 local libdifflua = require("libdifflua")
 local diff = libdifflua.cal_diff(src, dst, _G.lua_get_id, _G.lua_new_func)
 ```
-CPP会把Lua table转成内置数据结构，计算diff，然后再转回Lua Table。
 
-Lua调用CPP进行patch：
+Apply a patch:
 ```lua
-lualocal new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
+local new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
 ```
-最终new_dst与dst是相等的
+The C++ side converts Lua tables into its internal structure, computes the diff/patch, then converts the result back to Lua tables.
 
-## 其他
-[lua全家桶](https://github.com/esrrhs/lua-family-bucket)
+---
+
+## Related Projects
+* [Lua Family Bucket](https://github.com/esrrhs/lua-family-bucket)
+
+## License
+This project is licensed under the [MIT License](LICENSE).

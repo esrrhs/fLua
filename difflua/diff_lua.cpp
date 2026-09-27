@@ -422,7 +422,6 @@ PatchDiff(DiffVarInterface *src, DiffVarInterface *diff, DiffArrayElementGetIdFu
     if (__diff_lua_del) {
         auto it = __diff_lua_del->DiffGetTableIterator();
         while (it->Next()) {
-            auto k = it->Key();
             auto v = it->Value();
             src->DiffSetTableKeyValue(v, nullptr);
         }
