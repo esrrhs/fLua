@@ -154,18 +154,23 @@ auto new_dst = PatchDiff(src, diff, get_id, new_func);
 ```
 
 ### 3. Mixed C++ + Lua
-See `mix_cpp_test` in [`test/main.cpp`](./test/main.cpp) and [`mix_cpp_test.lua`](./mix_cpp_test.lua).
+See [`mix_cpp_test.lua`](./mix_cpp_test.lua) and `mix_cpp_test` in [`test/main.cpp`](./test/main.cpp). Load the built `libdifflua` module from Lua (add `build/bin` to `package.cpath` if needed):
 
-Compute a diff from Lua through the C++ library:
 ```lua
 local libdifflua = require("libdifflua")
-local diff = libdifflua.cal_diff(src, dst, _G.lua_get_id, _G.lua_new_func)
+
+local get_id = function(v)
+    return v.id
+end
+
+local diff = libdifflua.cal_diff(src, dst, get_id)
+local new_dst = libdifflua.patch_diff(src, diff, get_id)
 ```
 
-Apply a patch:
-```lua
-local new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
-```
+`get_id` is an ordinary Lua function `function(elem) return id end`. Omit it to skip object-array identity matching. Errors (unsupported types, a failing `get_id`, or bad arguments) are raised as Lua errors.
+
+C++ embedders can still pass two C functions as the 3rd and 4th arguments (`get_id` receives a `DiffVarInterface*` lightuserdata; `new_func` allocates one). Ordinary Lua usage does not need this form.
+
 The C++ side converts Lua tables into its internal structure, computes the diff/patch, then converts the result back to Lua tables.
 
 ---

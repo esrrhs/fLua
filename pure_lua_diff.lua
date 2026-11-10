@@ -1,4 +1,7 @@
 local function is_array_has_id(t, get_id)
+    if type(get_id) ~= "function" then
+        return false
+    end
     local i = 0
     for _ in pairs(t) do
         i = i + 1
@@ -8,7 +11,8 @@ local function is_array_has_id(t, get_id)
         if type(t[i]) ~= "table" then
             return false
         end
-        if not get_id(t[i]) then
+        -- Only nil means "no identity"; false/0 are valid ids.
+        if get_id(t[i]) == nil then
             return false
         end
     end
@@ -63,14 +67,28 @@ function _G.lua_diff(A, B, get_id)
     for k, v in pairs(B) do
         if type(B[k]) == "function" or type(B[k]) == "userdata" or type(B[k]) == "thread" then
             error("table_diff only supports diffs of tables!")
-        elseif not A[k] then
+        elseif A[k] == nil then
             diff[k] = v
         end
     end
 
     if next(diff.__diff_lua_del) == nil then
         diff.__diff_lua_del = nil
-        diff.__diff_lua_array = nil
+    end
+
+    -- Keep __diff_lua_array only when there is a real change (update/add/delete).
+    -- An identical object array must yield an empty diff so parent tables can drop it.
+    if diff.__diff_lua_array then
+        local only_array_flag = true
+        for k, _ in pairs(diff) do
+            if k ~= "__diff_lua_array" then
+                only_array_flag = false
+                break
+            end
+        end
+        if only_array_flag then
+            diff.__diff_lua_array = nil
+        end
     end
 
     return diff

@@ -38,5 +38,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/mix_cpp_test.lua
         $<TARGET_FILE_DIR:flua_test>/mix_cpp_test.lua
-    COMMENT "Copy mix_cpp_test.lua next to flua_test"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/pure_lua_diff.lua
+        $<TARGET_FILE_DIR:flua_test>/pure_lua_diff.lua
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/flua_regression.lua
+        $<TARGET_FILE_DIR:flua_test>/flua_regression.lua
+    COMMENT "Copy Lua test scripts next to flua_test"
 )

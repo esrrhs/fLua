@@ -25,3 +25,6 @@ jobs:
       run: |
         chmod +x ./build.sh
         ./build.sh
+      # build.sh configures, builds, and runs ctest (pure_lua_test + cpp_test).
+      # cpp_test covers native C++, libdifflua, Lua/C++ cross patch, and error paths.
+      # ctest --no-tests=error and a non-zero test exit fail this step.

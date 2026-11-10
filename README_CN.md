@@ -154,18 +154,23 @@ auto new_dst = PatchDiff(src, diff, get_id, new_func);
 ```
 
 ### 3. C++ + Lua 混合使用
-参考 [`test/main.cpp`](./test/main.cpp) 中的 `mix_cpp_test` 与 [`mix_cpp_test.lua`](./mix_cpp_test.lua)。
+参考 [`mix_cpp_test.lua`](./mix_cpp_test.lua) 与 [`test/main.cpp`](./test/main.cpp) 中的 `mix_cpp_test`。在 Lua 中加载编译出的 `libdifflua` 模块即可（如有需要，将 `build/bin` 加入 `package.cpath`）：
 
-在 Lua 中调用 C++ 计算 diff：
 ```lua
 local libdifflua = require("libdifflua")
-local diff = libdifflua.cal_diff(src, dst, _G.lua_get_id, _G.lua_new_func)
+
+local get_id = function(v)
+    return v.id
+end
+
+local diff = libdifflua.cal_diff(src, dst, get_id)
+local new_dst = libdifflua.patch_diff(src, diff, get_id)
 ```
 
-调用 C++ 进行 patch：
-```lua
-local new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
-```
+`get_id` 是普通的 Lua 函数 `function(elem) return id end`。省略该参数则不做对象数组的身份对齐。遇到不支持的类型、`get_id` 报错或参数不正确时，会抛出 Lua error。
+
+C++ 宿主仍可把两个 C 函数作为第 3、第 4 个参数传入（`get_id` 接收 `DiffVarInterface*` lightuserdata，`new_func` 负责分配）。普通 Lua 使用无需这种形式。
+
 C++ 侧会将 Lua table 转为内置数据结构，完成计算后再转回 Lua table。
 
 ---

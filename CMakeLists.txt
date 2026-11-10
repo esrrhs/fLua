@@ -33,14 +33,20 @@ enable_testing()
 
 find_program(LUA_EXECUTABLE NAMES lua lua5.4 lua5.3 lua5.2 lua5.1)
 if(LUA_EXECUTABLE)
+    # Quote LUA_PATH so the trailing ";;" is not split as a CMake list.
     add_test(
         NAME pure_lua_test
         COMMAND ${CMAKE_COMMAND} -E env
-            LUA_PATH=${CMAKE_SOURCE_DIR}/?.lua;;
+            "LUA_PATH=${CMAKE_SOURCE_DIR}/?.lua;;"
             ${LUA_EXECUTABLE} ${CMAKE_SOURCE_DIR}/pure_lua_test.lua
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
 else()
-    message(WARNING "Lua interpreter not found; skipping pure_lua_test")
+    if(DEFINED ENV{CI})
+        message(FATAL_ERROR "Lua interpreter not found; pure_lua_test is required in CI")
+    else()
+        message(WARNING "Lua interpreter not found; skipping pure_lua_test")
+    endif()
 endif()
 
 add_test(

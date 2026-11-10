@@ -1,167 +1,105 @@
 -- Prefer the locally built shared library next to the test binary
 package.cpath = "./?.so;./?.dylib;./?.dll;" .. package.cpath
+package.path = "./?.lua;" .. package.path
 
 local libdifflua = require("libdifflua")
+require("pure_lua_diff")
+local regression = require("flua_regression")
 
-local src = {
-    a = 1,
-    b = "2",
-    c = 3.3,
-    d = true,
-    sub = {
-        a = 11,
-        b = "22",
-        c = 33.3,
-        d = true,
-    },
-    array = { 1, 2, 3, 4 },
-    obj_array = {
-        { id = 1, a = 1, b = 2 },
-        { id = 2, a = 3, b = 4 },
-        { id = 3, a = 5, b = 6 },
-        { id = 4, a = 7, b = 8 },
+local function cpp_diff(src, dst, get_id)
+    if get_id then
+        return libdifflua.cal_diff(src, dst, get_id)
+    end
+    return libdifflua.cal_diff(src, dst)
+end
+
+local function cpp_patch(src, diff, get_id)
+    if get_id then
+        return libdifflua.patch_diff(src, diff, get_id)
+    end
+    return libdifflua.patch_diff(src, diff)
+end
+
+local failed = 0
+local total = 0
+
+local f, t = regression.run(cpp_diff, cpp_patch, "libdifflua")
+failed = failed + f
+total = total + t
+
+f, t = regression.run_cross(lua_diff, lua_patch, cpp_diff, cpp_patch)
+failed = failed + f
+total = total + t
+
+-- Backward-compatible 4-arg C callback form, injected by flua_test.
+if type(lua_get_id) == "function" and type(lua_new_func) == "function" then
+    local src = {
+        { id = 10, a = 1 },
+        { id = 20, a = 2 },
     }
-}
-
-local dst = {
-    b = "2",
-    c = 3.4,
-    d = false,
-    sub = {
-        a = 12,
-        b = "11",
-    },
-    array = { 2, 3 },
-    obj_array = {
-        { id = 2, a = 3, b = 4 },
-        { id = 3, a = 5, b = 6 },
-        { id = 4, a = 70, b = 80 },
+    local dst = {
+        { id = 10, a = 100 },
+        { id = 20, a = 2 },
     }
-}
+    local ok, diff = pcall(libdifflua.cal_diff, src, dst, lua_get_id, lua_new_func)
+    if not ok then
+        failed = failed + 1
+        print("FAIL  legacy_c_callbacks: cal_diff error: " .. tostring(diff))
+    else
+        local src_copy = regression.deep_copy(src)
+        local pok, patched = pcall(libdifflua.patch_diff, src_copy, diff, lua_get_id, lua_new_func)
+        if not pok then
+            failed = failed + 1
+            print("FAIL  legacy_c_callbacks: patch_diff error: " .. tostring(patched))
+        elseif not regression.deep_equal(dst, patched, function(v) return v.id end) then
+            failed = failed + 1
+            print("FAIL  legacy_c_callbacks: patched result does not match dst")
+        elseif diff.__diff_lua_array ~= true or type(diff[10]) ~= "table" then
+            failed = failed + 1
+            print("FAIL  legacy_c_callbacks: expected id-keyed object-array diff")
+        else
+            print("OK  legacy_c_callbacks")
+        end
+    end
+    total = total + 1
+end
 
-local function print_table(node)
-    if type(node) ~= "table" then
-        print(tostring(node))
+local function expect_error(name, fn, needle)
+    total = total + 1
+    local ok, err = pcall(fn)
+    if ok then
+        failed = failed + 1
+        print("FAIL  " .. name .. ": expected an error")
         return
     end
-
-    local cache, stack, output = {}, {}, {}
-    local depth = 1
-    local output_str = "{\n"
-
-    while true do
-        local size = 0
-        for k, v in pairs(node) do
-            size = size + 1
-        end
-
-        local cur_index = 1
-        for k, v in pairs(node) do
-            if (cache[node] == nil) or (cur_index >= cache[node]) then
-
-                if (string.find(output_str, "}", output_str:len())) then
-                    output_str = output_str .. ",\n"
-                elseif not (string.find(output_str, "\n", output_str:len())) then
-                    output_str = output_str .. "\n"
-                end
-
-                -- This is necessary for working with HUGE tables otherwise we run out of memory using concat on huge strings
-                table.insert(output, output_str)
-                output_str = ""
-
-                local key
-                if (type(k) == "number" or type(k) == "boolean") then
-                    key = "[" .. tostring(k) .. "]"
-                else
-                    key = "['" .. tostring(k) .. "']"
-                end
-
-                if (type(v) == "number" or type(v) == "boolean") then
-                    output_str = output_str .. string.rep('\t', depth) .. key .. " = " .. tostring(v)
-                elseif (type(v) == "table") then
-                    output_str = output_str .. string.rep('\t', depth) .. key .. " = {\n"
-                    table.insert(stack, node)
-                    table.insert(stack, v)
-                    cache[node] = cur_index + 1
-                    break
-                else
-                    output_str = output_str .. string.rep('\t', depth) .. key .. " = '" .. tostring(v) .. "'"
-                end
-
-                if (cur_index == size) then
-                    output_str = output_str .. "\n" .. string.rep('\t', depth - 1) .. "}"
-                else
-                    output_str = output_str .. ","
-                end
-            else
-                -- close the table
-                if (cur_index == size) then
-                    output_str = output_str .. "\n" .. string.rep('\t', depth - 1) .. "}"
-                end
-            end
-
-            cur_index = cur_index + 1
-        end
-
-        if (size == 0) then
-            output_str = output_str .. "\n" .. string.rep('\t', depth - 1) .. "}"
-        end
-
-        if (#stack > 0) then
-            node = stack[#stack]
-            stack[#stack] = nil
-            depth = cache[node] == nil and depth + 1 or depth - 1
-        else
-            break
-        end
+    err = tostring(err)
+    if needle and not string.find(err, needle, 1, true) then
+        failed = failed + 1
+        print("FAIL  " .. name .. ": unexpected error: " .. err)
+        return
     end
-
-    -- This is necessary for working with HUGE tables otherwise we run out of memory using concat on huge strings
-    table.insert(output, output_str)
-    output_str = table.concat(output)
-
-    print(output_str)
+    print("OK  " .. name)
 end
 
-function equals(o1, o2)
-    if o1 == o2 then
-        return true
-    end
-    local o1Type = type(o1)
-    local o2Type = type(o2)
-    if o1Type ~= o2Type then
-        return false
-    end
-    if o1Type ~= 'table' then
-        return false
-    end
+expect_error("error_unsupported_type", function()
+    libdifflua.cal_diff({ f = function() end }, { f = 1 })
+end, "unsupported Lua type")
 
-    local keySet = {}
+expect_error("error_get_id_throws", function()
+    libdifflua.cal_diff({ { id = 1 } }, { { id = 2 } }, function()
+        error("boom")
+    end)
+end, "get_id failed")
 
-    for key1, value1 in pairs(o1) do
-        local value2 = o2[key1]
-        if value2 == nil or equals(value1, value2) == false then
-            return false
-        end
-        keySet[key1] = true
-    end
+expect_error("error_bad_get_id_arg", function()
+    libdifflua.cal_diff({}, {}, "not a function")
+end, "get_id must be a function")
 
-    for key2, _ in pairs(o2) do
-        if not keySet[key2] then
-            return false
-        end
-    end
-    return true
-end
+expect_error("error_too_few_args", function()
+    libdifflua.cal_diff({})
+end, "requires at least 2 arguments")
 
-local diff = libdifflua.cal_diff(src, dst, _G.lua_get_id, _G.lua_new_func)
-print_table(diff)
-
-local new_dst = libdifflua.patch_diff(src, diff, _G.lua_get_id, _G.lua_new_func)
-print_table(new_dst)
-
-if equals(dst, new_dst) then
-    print("patch success")
-else
-    error("patch failed")
+print(string.format("mix_cpp_test: %d/%d passed", total - failed, total))
+if failed > 0 then
+    error("mix_cpp_test failed: " .. failed .. " case(s)")
 end

@@ -305,8 +305,11 @@ extern "C" DiffVarInterface *
 PatchDiff(DiffVarInterface *src, DiffVarInterface *diff, DiffArrayElementGetIdFunc get_id_func,
           DiffVarNewFunc new_func);
 
-// 计算差分，针对Lua的接口，参数与CalDiff一致
+// Lua 模块接口：cal_diff(src, dst [, get_id])
+// get_id 为可选的 Lua 函数 function(elem) -> id | nil；省略则不做对象数组身份对齐。
+// 兼容旧用法：cal_diff(src, dst, c_get_id, c_new_func)，后两个必须是 C 函数
+//（c_get_id 接收 lightuserdata DiffVarInterface*，c_new_func 分配 DiffVarInterface*）。
 extern "C" int LuaCalDiff(lua_State *L);
 
-// 合并差分，针对Lua的接口，参数与PatchDiff一致
+// Lua 模块接口：patch_diff(src, diff [, get_id])，参数约定与 LuaCalDiff 相同
 extern "C" int LuaPatchDiff(lua_State *L);
